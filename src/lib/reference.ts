@@ -1,3 +1,5 @@
+import leadTimes from "../data/lead-times.json";
+
 // Agency codes used in the Delaware Bids & Contracts datasets. Only codes we
 // are confident about are named; anything else is shown as its raw code.
 export const AGENCY_NAMES: Record<string, string> = {
@@ -103,15 +105,32 @@ export function categoryFor(codes: string[]): string {
   return "Other / Unclassified";
 }
 
-// Typical months between a solicitation posting and the incumbent contract's
-// expiration, by segment. These are planning assumptions, not measured values:
-// complex services are solicited well ahead, commodities and single projects less so.
-const LONG_LEAD = new Set(["43", "80", "81", "83", "84", "85", "86", "93"]);
-const SHORT_LEAD = new Set(["72", "95", "15", "50"]);
+// Months between a rebid posting and the incumbent contract's expiration,
+// measured from past Delaware bids by scripts/calibrate-lead-times.ts. A
+// segment without enough matched bids uses the figures for all bids.
+export interface LeadTime {
+  median: number;
+  p25: number;
+  p75: number;
+  n: number;
+  basis: string; // e.g. "Engineering & IT Services" or "all categories"
+}
 
-export function leadMonthsFor(codes: string[]): number {
-  const segs = codes.map((c) => c.slice(0, 2));
-  if (segs.some((s) => LONG_LEAD.has(s))) return 9;
-  if (segs.length && segs.every((s) => SHORT_LEAD.has(s))) return 4;
-  return 6;
+const MAX_LEAD_MONTHS = 24; // beyond this the sample is too thin to trust
+
+export function leadTimeFor(codes: string[]): LeadTime {
+  const segments = leadTimes.segments as Record<string, { n: number; p25: number; median: number; p75: number }>;
+  let best: [string, (typeof segments)[string]] | null = null;
+  for (const seg of new Set(codes.map((c) => c.slice(0, 2)))) {
+    const s = segments[seg];
+    if (s && (!best || s.n > best[1].n)) best = [seg, s];
+  }
+  const s = best ? best[1] : leadTimes.overall;
+  return {
+    median: s.median,
+    p25: Math.max(s.p25, 0),
+    p75: Math.min(s.p75, MAX_LEAD_MONTHS),
+    n: s.n,
+    basis: best ? UNSPSC_SEGMENTS[best[0]] ?? best[0] : "all categories",
+  };
 }

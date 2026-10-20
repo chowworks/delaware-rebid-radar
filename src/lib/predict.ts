@@ -1,4 +1,4 @@
-import { agencyName, categoryFor, leadMonthsFor } from "./reference";
+import { agencyName, categoryFor, leadTimeFor } from "./reference";
 import type {
   Contract,
   Likelihood,
@@ -20,26 +20,28 @@ const ONE_OFF = [
 ];
 
 const RECURRING = [
-  /\bservices?\b/, /\bsuppl(y|ies)\b/, /\bmaintenance\b/, /\bstatewide\b/, /\bon[- ]call\b/,
-  /\bopen end\b/, /\bas needed\b/, /\bfuel\b/, /\boil\b/, /\bdiesel\b/, /\bprogram\b/,
-  /\bmanagement\b/, /\brental\b/, /\blease\b/, /\binspection\b/, /\baudit/,
+  /\bservices?\b/, /\bsuppl(y|ies)\b/, /\bmaintenance\b(?! facility)/, /\bstatewide\b/, /\bon[- ]call\b/,
+  /\bopen end\b/, /\bas needed\b/, /\bprogram\b/, /\bmanagement\b/, /\brental\b/, /\blease\b/,
+  /\binspection\b/, /\baudit(s|ing)?\b/,
 ];
+
+// Commodities bought over and over, but naming one in a project title
+// ("Diesel Generator Replacement") does not make the project recur.
+const COMMODITY = [/\bfuel\b/, /\boil\b/, /\bdiesel\b/];
 
 const DAY = 86_400_000;
 
-function isoDate(s?: string): string | null {
+export function isoDate(s?: string): string | null {
   if (!s) return null;
   const d = s.slice(0, 10);
   return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null;
 }
 
-function addMonths(iso: string, months: number): string {
-  const d = new Date(iso + "T00:00:00Z");
-  d.setUTCMonth(d.getUTCMonth() + months);
-  return d.toISOString().slice(0, 10);
+function monthsBefore(iso: string, months: number): string {
+  return new Date(Date.parse(iso) - Math.round(months * 30.44) * DAY).toISOString().slice(0, 10);
 }
 
-function daysBetween(a: string, b: string): number {
+export function daysBetween(a: string, b: string): number {
   return Math.round((Date.parse(b) - Date.parse(a)) / DAY);
 }
 
@@ -48,7 +50,7 @@ export function mmpId(url?: string): string | null {
   return m ? m[1] : null;
 }
 
-function tokens(title: string): Set<string> {
+export function tokens(title: string): Set<string> {
   return new Set(
     title
       .toLowerCase()
@@ -58,7 +60,7 @@ function tokens(title: string): Set<string> {
   );
 }
 
-function jaccard(a: Set<string>, b: Set<string>): number {
+export function jaccard(a: Set<string>, b: Set<string>): number {
   if (!a.size || !b.size) return 0;
   let inter = 0;
   for (const t of a) if (b.has(t)) inter++;
@@ -67,7 +69,7 @@ function jaccard(a: Set<string>, b: Set<string>): number {
 
 // Delaware contract numbers often look like GSS21780-ULSHEATOIL: the suffix
 // after the hyphen tends to survive from one award cycle to the next.
-function numberSuffix(num: string): string | null {
+export function numberSuffix(num: string): string | null {
   const parts = num.toUpperCase().split("-");
   if (parts.length < 2) return null;
   const suffix = parts.slice(1).join("-");
@@ -153,10 +155,12 @@ export function buildContracts(
     const termMonths = effective
       ? Math.round(daysBetween(effective, expiration) / 30.44)
       : null;
-    const leadMonths = leadMonthsFor(unspsc);
-    const predicted = addMonths(expiration, -leadMonths);
-    const windowStart = addMonths(predicted, -2);
-    const windowEnd = [addMonths(predicted, 2), expiration].sort()[0];
+    const lead = leadTimeFor(unspsc);
+    const leadMonths = Math.round(lead.median);
+    // The window spans the middle half of measured lead times for the category.
+    const windowStart = monthsBefore(expiration, lead.p75);
+    const windowEnd = monthsBefore(expiration, lead.p25);
+    const predicted = monthsBefore(expiration, lead.median);
     const priorAwards = priorAwardsFor(r, index);
 
     const title = r.contracttitle.toLowerCase();
@@ -165,6 +169,7 @@ export function buildContracts(
     const oneOff = ONE_OFF.some((re) => re.test(title)) ||
       (constructionOnly && termMonths !== null && termMonths <= 24);
     const recurring = RECURRING.some((re) => re.test(title));
+    const commodity = COMMODITY.some((re) => re.test(title));
 
     const features = (r.multifeatures ?? "").split(";").map((s) => s.trim());
     const cooperative = features.includes("Cooperative Contract") ||
@@ -188,7 +193,7 @@ export function buildContracts(
     } else if (priorAwards > 0) {
       likelihood = "High";
       reasons.push(`Matches ${priorAwards} earlier award${priorAwards > 1 ? "s" : ""} in the archive, so this looks like a recurring need.`);
-    } else if (recurring) {
+    } else if (recurring || commodity) {
       likelihood = "Medium";
       reasons.push("Title suggests an ongoing need, but no earlier award was found in the archive.");
     } else {
@@ -196,7 +201,7 @@ export function buildContracts(
       reasons.push("No earlier award found in the archive; recurrence is uncertain.");
     }
     reasons.push(
-      `Solicitation assumed about ${leadMonths} months before expiration for this category.`,
+      `Past Delaware rebids in ${lead.basis} were typically posted ${Math.round(lead.p25)} to ${Math.round(lead.p75)} months before the old contract expired (median ${Math.round(lead.median)}, from ${lead.n} matched bids).`,
     );
 
     out.push({
@@ -217,6 +222,7 @@ export function buildContracts(
       url: r.contracturl?.url ?? null,
       vendors: vendorsById.get(id) ?? [],
       leadMonths,
+      predicted,
       windowStart,
       windowEnd,
       status: statusFor(today, windowStart, windowEnd),
@@ -227,5 +233,5 @@ export function buildContracts(
     });
   }
 
-  return out.sort((a, b) => a.windowStart.localeCompare(b.windowStart));
+  return out.sort((a, b) => a.predicted.localeCompare(b.predicted));
 }

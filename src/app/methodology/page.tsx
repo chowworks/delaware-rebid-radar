@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import leadTimes from "@/data/lead-times.json";
 
 export const metadata: Metadata = { title: "How it works" };
 
@@ -10,22 +11,28 @@ export default function Methodology() {
         <section>
           <h2 className="text-lg font-semibold text-navy-900">Where the data comes from</h2>
           <p className="mt-2">
-            Everything here comes from three public datasets on data.delaware.gov, refreshed daily:{" "}
+            Contracts come from three public datasets on data.delaware.gov, refreshed daily:{" "}
             <a className="underline" href="https://data.delaware.gov/d/xxed-9nm8">Current Contracts</a>,{" "}
             <a className="underline" href="https://data.delaware.gov/d/ey64-me86">Archived Contracts</a>, and{" "}
             <a className="underline" href="https://data.delaware.gov/d/h9bb-iyu6">Awarded Vendor Contact Info</a>.
-            They cover contracts posted on Delaware Bids &amp; Contracts (MMP).
+            They cover contracts posted on Delaware Bids &amp; Contracts (MMP). Lead times are measured from the{" "}
+            <a className="underline" href="https://data.delaware.gov/d/2hnj-zwix">Open</a>,{" "}
+            <a className="underline" href="https://data.delaware.gov/d/yhim-4378">Recently Closed</a> and{" "}
+            <a className="underline" href="https://data.delaware.gov/d/bnup-azrk">Not Awarded</a> bid datasets.
           </p>
         </section>
         <section>
           <h2 className="text-lg font-semibold text-navy-900">The predicted window</h2>
           <p className="mt-2">
-            For each current contract we take its expiration date and subtract a typical solicitation lead time for its category:
-            about 9 months for complex services and IT, 4 months for construction projects, fuel and food, and 6 months for everything else.
-            The window runs two months either side of that date, and never past the expiration date.
+            We matched {leadTimes.bidsMatched} past Delaware bids to the contracts they replaced (same agency, and the same
+            contract-number suffix or a near-identical title) and measured how many months before the old contract expired
+            each bid was posted. Across all categories the median is {Math.round(leadTimes.overall.median)} months, but half of
+            rebids fall between {Math.round(leadTimes.overall.p25)} and {Math.round(leadTimes.overall.p75)} months.
           </p>
           <p className="mt-2">
-            These lead times are planning assumptions. They have not yet been measured against actual Delaware solicitation dates.
+            Each contract&apos;s window is that middle half for its category (or for all categories when its category had fewer
+            than 8 matched bids), counted back from the expiration date. &ldquo;Most likely&rdquo; is the median. By construction
+            about half of real rebids land inside the window; a quarter post earlier and a quarter later.
           </p>
         </section>
         <section>
@@ -43,6 +50,11 @@ export default function Methodology() {
             <li>Contract values are not included for most contracts, so we cannot rank by size.</li>
             <li>Only contracts posted on MMP are covered. Purchases below bid thresholds and many school district buys are not.</li>
             <li>Agency codes without a confident name are shown as their raw code.</li>
+            <li>
+              Lead times come from only {leadTimes.bidsMatched} matched bids, mostly ones that were not awarded (awarded bids are not
+              published as a dataset). Several categories have fewer than 20 matches, and the bid-to-contract matching is by title, so
+              some matches are wrong.
+            </li>
           </ul>
         </section>
       </div>

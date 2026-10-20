@@ -60,7 +60,7 @@ export default async function ContractPage({ params }: Params) {
     ["Effective", fmtDate(c.effective)],
     ["Expires", fmtDate(c.expiration)],
     ["Current term", fmtTerm(c.termMonths)],
-    ["Assumed lead time", `${c.leadMonths} months before expiration`],
+    ["Typical lead time", `~${c.leadMonths} months before expiration (measured)`],
   ];
 
   return (
@@ -86,6 +86,7 @@ export default async function ContractPage({ params }: Params) {
               <p className="mt-1 text-xl font-semibold text-navy-900 tabular">
                 {fmtDate(c.windowStart)} – {fmtDate(c.windowEnd)}
               </p>
+              <p className="text-sm text-slate-600">Most likely around {fmtDate(c.predicted)}</p>
               <p className="mb-4 text-sm text-slate-500">{windowCaption(c.status, c.daysToWindow)}</p>
               <Timeline c={c} />
             </section>

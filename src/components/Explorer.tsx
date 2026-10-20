@@ -21,13 +21,13 @@ function inTiming(c: Contract, timing: Timing): boolean {
 function toCsv(rows: Contract[]): string {
   const head = [
     "Contract number", "Title", "Agency", "Category", "Effective", "Expiration",
-    "Predicted window start", "Predicted window end", "Rebid likelihood", "Incumbent vendors", "MMP link",
+    "Predicted window start", "Predicted window end", "Most likely posting", "Rebid likelihood", "Incumbent vendors", "MMP link",
   ];
   const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
   const lines = rows.map((c) =>
     [
       c.number, c.title, c.agencyName, c.category, c.effective ?? "", c.expiration,
-      c.windowStart, c.windowEnd, c.likelihood, c.vendors.map((v) => v.name).join("; "), c.url ?? "",
+      c.windowStart, c.windowEnd, c.predicted, c.likelihood, c.vendors.map((v) => v.name).join("; "), c.url ?? "",
     ].map((v) => esc(String(v))).join(","),
   );
   return [head.map(esc).join(","), ...lines].join("\n");
@@ -74,9 +74,9 @@ export default function Explorer({ contracts, initialQuery = "" }: { contracts: 
       return true;
     });
     const by: Record<Sort, (a: Contract, b: Contract) => number> = {
-      window: (a, b) => a.windowStart.localeCompare(b.windowStart),
+      window: (a, b) => a.predicted.localeCompare(b.predicted),
       expiration: (a, b) => a.expiration.localeCompare(b.expiration),
-      agency: (a, b) => a.agencyName.localeCompare(b.agencyName) || a.windowStart.localeCompare(b.windowStart),
+      agency: (a, b) => a.agencyName.localeCompare(b.agencyName) || a.predicted.localeCompare(b.predicted),
     };
     return rows.sort(by[sort]);
   }, [contracts, q, agency, category, timing, likelihoods, hideCoop, setAsideOnly, hidePassed, sort]);
