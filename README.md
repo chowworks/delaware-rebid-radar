@@ -53,3 +53,11 @@ app falls back to the sample and shows a banner.
 1. Import this repo in Vercel (framework preset: Next.js, no build settings to change).
 2. Optional: set `SOCRATA_APP_TOKEN` to raise API rate limits.
 3. Deploy.
+
+## Designs
+
+Two designs ship in the same app. The original is the default. Add `?design=2` to any URL to
+switch to option 2 (inspired by samsearch.co); a cookie keeps it for later visits, and
+`?design=1` switches back. `src/middleware.ts` rewrites requests to `src/app/v2` when option 2
+is on, so URLs stay the same. Both designs share the search and filter logic in
+`src/components/useExplorer.ts`.
