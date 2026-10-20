@@ -87,7 +87,7 @@ export default async function ContractPage({ params }: Params) {
                 {fmtDate(c.windowStart)} – {fmtDate(c.windowEnd)}
               </p>
               <p className="text-sm text-slate-600">Most likely around {fmtDate(c.predicted)}</p>
-              <p className="mb-4 text-sm text-slate-500">{windowCaption(c.status, c.daysToWindow)}</p>
+              <p className="mb-4 text-sm text-slate-500">{windowCaption(c.status, c.daysToPredicted)}</p>
               <Timeline c={c} />
             </section>
 

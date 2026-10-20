@@ -11,7 +11,7 @@ export default async function Home() {
   const actionable = all.filter((c) => !c.cooperative && c.likelihood !== "Low");
   const openNow = actionable.filter((c) => c.status === "open");
   const next90 = actionable.filter((c) => c.status === "upcoming");
-  const next12 = actionable.filter((c) => c.status === "open" || (c.daysToWindow > 0 && c.daysToWindow <= 365));
+  const next12 = actionable.filter((c) => c.status === "open" || (c.daysToPredicted > 0 && c.daysToPredicted <= 365));
   const noDiverseIncumbent = next12.filter((c) => c.vendors.length > 0 && !c.vendors.some((v) => v.mwbe));
   const spotlight = [...openNow, ...next90].slice(0, 6);
 
@@ -21,8 +21,8 @@ export default async function Home() {
 
   const stats = [
     { label: "Current contracts tracked", value: all.length },
-    { label: "Rebid windows open now", value: openNow.length },
-    { label: "Opening in the next 90 days", value: next90.length },
+    { label: "Rebids expected now", value: openNow.length },
+    { label: "Expected in the next 90 days", value: next90.length },
     { label: "Next 12 months, no OSD-certified incumbent", value: noDiverseIncumbent.length },
   ];
 
