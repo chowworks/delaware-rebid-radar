@@ -89,12 +89,13 @@ export default async function ContractPage({ params }: Params) {
         <div className="grid gap-6 md:grid-cols-[1fr_320px]">
           <div className="space-y-6">
             <section className={`${card} shadow-[0_12px_40px_rgb(11_26_51/0.06)]`}>
-              <h2 className="eyebrow text-ink-400">Predicted rebid window</h2>
-              <p className="display mt-3 text-4xl text-ink-900 tabular">
-                {fmtDate(c.windowStart)} – {fmtDate(c.windowEnd)}
+              <h2 className="eyebrow text-ink-400">Most likely rebid posting</h2>
+              <p className="display mt-3 text-4xl text-ink-900 tabular">Around {fmtDate(c.predicted)}</p>
+              <p className="mt-2 text-sm text-ink-700">{windowCaption(c.status, c.daysToPredicted)}</p>
+              <p className="mb-6 text-sm text-ink-500">
+                Half of past rebids like this posted between <span className="font-mono">{fmtDate(c.windowStart)}</span> and{" "}
+                <span className="font-mono">{fmtDate(c.windowEnd)}</span>.
               </p>
-              <p className="mt-2 text-sm text-ink-700">Most likely around <span className="font-mono">{fmtDate(c.predicted)}</span></p>
-              <p className="mb-6 text-sm text-ink-500">{windowCaption(c.status, c.daysToWindow)}</p>
               <Timeline c={c} />
             </section>
 

@@ -26,9 +26,9 @@ export function fmtTerm(months: number | null): string {
 }
 
 export const STATUS_LABEL: Record<WindowStatus, string> = {
-  open: "Window open",
-  upcoming: "Opens within 90 days",
-  closing: "Window passed",
+  open: "Expected now",
+  upcoming: "Expected within 90 days",
+  closing: "Likely already posted",
   later: "Later",
 };
 
@@ -45,10 +45,9 @@ export const LIKELIHOOD_STYLE: Record<Likelihood, string> = {
   Low: "bg-slate-100 text-slate-600",
 };
 
-export function windowCaption(status: WindowStatus, daysToWindow: number): string {
-  if (status === "open") return "Watch for the solicitation now";
-  if (status === "closing") return "Likely already posted or awarded; check MMP";
-  if (daysToWindow <= 0) return "";
-  if (daysToWindow < 60) return `Opens in ${daysToWindow} days`;
-  return `Opens in ~${Math.round(daysToWindow / 30.44)} months`;
+export function windowCaption(status: WindowStatus, daysToPredicted: number): string {
+  if (status === "closing") return "Most likely date has passed; check MMP for an open bid";
+  if (status === "open") return daysToPredicted >= 0 ? "Watch for the solicitation now" : "Most likely date just passed; watch MMP now";
+  if (daysToPredicted < 60) return `Most likely in ${daysToPredicted} days`;
+  return `Most likely in ~${Math.round(daysToPredicted / 30.44)} months`;
 }

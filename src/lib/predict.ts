@@ -109,12 +109,19 @@ function priorAwardsFor(r: RawContract, index: ArchiveIndex): number {
   return count;
 }
 
-function statusFor(today: string, start: string, end: string): WindowStatus {
-  if (today >= start && today <= end) return "open";
-  if (today < start) return daysBetween(today, start) <= 90 ? "upcoming" : "later";
-  // Past the window (or past expiration but still listed): the replacement is
-  // most likely already in procurement.
-  return "closing";
+// Status keys off the most likely posting date, not the window edges: measured
+// windows span many months, so "inside the window" would flag contracts whose
+// rebid most likely posted long ago.
+export const DUE_NOW_PAST_DAYS = 60; // predicted date up to 2 months ago
+export const DUE_NOW_AHEAD_DAYS = 30; // or within the next month
+export const UPCOMING_DAYS = 90;
+
+export function statusFor(today: string, predicted: string): WindowStatus {
+  const d = daysBetween(today, predicted);
+  if (d < -DUE_NOW_PAST_DAYS) return "closing"; // most likely already posted
+  if (d <= DUE_NOW_AHEAD_DAYS) return "open";
+  if (d <= UPCOMING_DAYS) return "upcoming";
+  return "later";
 }
 
 export function buildContracts(
@@ -225,8 +232,8 @@ export function buildContracts(
       predicted,
       windowStart,
       windowEnd,
-      status: statusFor(today, windowStart, windowEnd),
-      daysToWindow: daysBetween(today, windowStart),
+      status: statusFor(today, predicted),
+      daysToPredicted: daysBetween(today, predicted),
       likelihood,
       reasons,
       priorAwards,

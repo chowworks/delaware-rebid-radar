@@ -31,7 +31,7 @@ export default async function Home() {
   const actionable = all.filter((c) => !c.cooperative && c.likelihood !== "Low");
   const openNow = actionable.filter((c) => c.status === "open");
   const next90 = actionable.filter((c) => c.status === "upcoming");
-  const next12 = actionable.filter((c) => c.status === "open" || (c.daysToWindow > 0 && c.daysToWindow <= 365));
+  const next12 = actionable.filter((c) => c.status === "open" || (c.daysToPredicted > 0 && c.daysToPredicted <= 365));
   const noDiverseIncumbent = next12.filter((c) => c.vendors.length > 0 && !c.vendors.some((v) => v.mwbe));
   const spotlight = [...openNow, ...next90].slice(0, 6);
 
@@ -42,8 +42,8 @@ export default async function Home() {
   // Lead with the number that matters most to OSD: upcoming work no certified firm holds today.
   const stats = [
     { label: "Likely rebids in the next 12 months with no OSD-certified incumbent", value: noDiverseIncumbent.length },
-    { label: "Rebid windows open now", value: openNow.length },
-    { label: "Opening in the next 90 days", value: next90.length },
+    { label: "Rebids expected now", value: openNow.length },
+    { label: "Expected in the next 90 days", value: next90.length },
     { label: "Current contracts tracked", value: all.length },
   ];
 
@@ -107,11 +107,11 @@ export default async function Home() {
         <section className="grid gap-10 py-20 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16 lg:pl-9">
           <div>
             <SectionHead n="01" title="Coming up next.">
-              Rebid windows that are open now or open in the next 90 days, leaving out one-off projects and cooperative contracts.
+              Rebids expected now or in the next 90 days, by most likely posting date. One-off projects and cooperative contracts are left out.
             </SectionHead>
             <ul className="mt-8 space-y-5">
               {[
-                ["Predicted window", "Measured from how far ahead Delaware posted past rebids in the same category."],
+                ["Most likely date", "Measured from how far ahead Delaware posted past rebids in the same category."],
                 ["Rebid likelihood", "Higher when an earlier award for the same need exists in the archive."],
                 ["Incumbent", "Who holds the contract now, and whether they are OSD certified."],
               ].map(([k, v]) => (
@@ -135,7 +135,7 @@ export default async function Home() {
               <span className="font-mono text-xs text-ink-400">{spotlight.length} shown</span>
             </div>
             {spotlight.length === 0 ? (
-              <p className="p-6 text-sm text-ink-500">No rebid windows open now or in the next 90 days.</p>
+              <p className="p-6 text-sm text-ink-500">No rebids expected now or in the next 90 days.</p>
             ) : (
               <ul className="divide-y divide-line">
                 {spotlight.map((c) => (
@@ -149,7 +149,7 @@ export default async function Home() {
                       <div className="col-start-2 mt-2 flex items-center gap-3 sm:col-start-3 sm:mt-0 sm:flex-col sm:items-end sm:gap-1">
                         <span className="font-mono text-xs text-ink-700 tabular">likely {fmtMonth(c.predicted)}</span>
                         <span className="flex items-center gap-1.5 font-mono text-[11px] text-ink-400">
-                          <LikelihoodMeter likelihood={c.likelihood} /> {windowCaption(c.status, c.daysToWindow) || c.likelihood}
+                          <LikelihoodMeter likelihood={c.likelihood} /> {windowCaption(c.status, c.daysToPredicted) || c.likelihood}
                         </span>
                       </div>
                     </Link>

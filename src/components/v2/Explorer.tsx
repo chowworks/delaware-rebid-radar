@@ -46,11 +46,11 @@ export default function Explorer({ contracts, initialQuery = "" }: { contracts: 
         <div className={`${showFilters ? "grid" : "hidden"} gap-2 border-t border-line px-2 pb-1 pt-3 sm:grid-cols-2 lg:mt-1 lg:flex lg:flex-wrap lg:items-center`}>
           <label className="sr-only" htmlFor="timing">Predicted window</label>
           <select id="timing" value={timing} onChange={(e) => { setTiming(e.target.value as Timing); setShown(PAGE); }} className={select}>
-            <option value="all">Window: any time</option>
-            <option value="open">Window: open now</option>
-            <option value="90">Window: open or within 90 days</option>
-            <option value="180">Window: open or within 6 months</option>
-            <option value="365">Window: open or within 12 months</option>
+            <option value="all">Expected: any time</option>
+            <option value="open">Expected: now</option>
+            <option value="90">Expected: now or within 90 days</option>
+            <option value="180">Expected: now or within 6 months</option>
+            <option value="365">Expected: now or within 12 months</option>
           </select>
           <label className="sr-only" htmlFor="agency">Agency</label>
           <select id="agency" value={agency} onChange={(e) => { setAgency(e.target.value); setShown(PAGE); }} className={`${select} lg:max-w-64`}>
@@ -91,7 +91,7 @@ export default function Explorer({ contracts, initialQuery = "" }: { contracts: 
           </label>
           <label className={toggle(hidePassed)}>
             <input type="checkbox" className="accent-de-600" checked={hidePassed} onChange={(e) => { setHidePassed(e.target.checked); setShown(PAGE); }} />
-            Hide passed windows
+            Hide likely already posted
           </label>
           <button type="button" onClick={reset} className="ml-auto px-2 text-xs font-medium text-de-600 hover:text-de-700">Reset filters</button>
         </div>
@@ -104,7 +104,7 @@ export default function Explorer({ contracts, initialQuery = "" }: { contracts: 
         <div className="flex items-center gap-2">
           <label htmlFor="sort" className="font-mono text-[11px] uppercase tracking-wider text-ink-400">Sort</label>
           <select id="sort" value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="rounded-lg border border-line bg-white px-2 py-1.5 text-sm">
-            <option value="window">Predicted window</option>
+            <option value="window">Most likely date</option>
             <option value="expiration">Expiration date</option>
             <option value="agency">Agency</option>
           </select>
@@ -121,9 +121,9 @@ export default function Explorer({ contracts, initialQuery = "" }: { contracts: 
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-line bg-white">
-          <div className="hidden grid-cols-[minmax(0,1fr)_170px_150px_120px] gap-4 border-b border-line bg-paper px-5 py-2.5 md:grid">
+          <div className="hidden grid-cols-[minmax(0,1fr)_210px_170px_110px] gap-4 border-b border-line bg-paper px-5 py-2.5 md:grid">
             <span className="eyebrow text-ink-400">Contract</span>
-            <span className="eyebrow text-ink-400">Predicted window</span>
+            <span className="eyebrow text-ink-400">Most likely posting</span>
             <span className="eyebrow text-ink-400">Status</span>
             <span className="eyebrow text-right text-ink-400">Likelihood</span>
           </div>
@@ -132,7 +132,7 @@ export default function Explorer({ contracts, initialQuery = "" }: { contracts: 
               <li key={c.id}>
                 <Link
                   href={`/opportunities/${encodeURIComponent(c.id)}`}
-                  className="grid gap-3 px-5 py-4 transition hover:bg-de-50 md:grid-cols-[minmax(0,1fr)_170px_150px_120px] md:items-center md:gap-4"
+                  className="grid gap-3 px-5 py-4 transition hover:bg-de-50 md:grid-cols-[minmax(0,1fr)_210px_170px_110px] md:items-center md:gap-4"
                 >
                   <div className="min-w-0">
                     <p className="font-mono text-[11px] text-ink-400">{c.number}</p>
@@ -151,8 +151,9 @@ export default function Explorer({ contracts, initialQuery = "" }: { contracts: 
                     </p>
                   </div>
                   <div>
-                    <p className="font-mono text-sm text-ink-900 tabular">{fmtMonth(c.windowStart)} – {fmtMonth(c.windowEnd)}</p>
-                    <p className="text-xs text-ink-400">{windowCaption(c.status, c.daysToWindow)}</p>
+                    <p className="font-mono text-sm text-ink-900 tabular">{fmtMonth(c.predicted)}</p>
+                    <p className="text-xs text-ink-500">{windowCaption(c.status, c.daysToPredicted)}</p>
+                    <p className="mt-0.5 whitespace-nowrap font-mono text-[11px] text-ink-400 tabular">window {fmtMonth(c.windowStart)} – {fmtMonth(c.windowEnd)}</p>
                   </div>
                   <div><StatusBadge status={c.status} /></div>
                   <div className="flex items-center gap-2 md:justify-end">

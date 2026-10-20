@@ -34,6 +34,12 @@ export default function Methodology() {
             than 8 matched bids), counted back from the expiration date. &ldquo;Most likely&rdquo; is the median. By construction
             about half of real rebids land inside the window; a quarter post earlier and a quarter later.
           </p>
+          <p className="mt-2">
+            Status follows the most likely date, not the window edges. A contract is &ldquo;expected now&rdquo; from one month
+            before its most likely date to two months after, &ldquo;expected within 90 days&rdquo; up to three months ahead, and
+            &ldquo;likely already posted&rdquo; once its most likely date is more than two months past. Those are hidden by default
+            but are worth a check on MMP.
+          </p>
         </section>
         <section>
           <h2 className="text-lg font-semibold text-navy-900">Rebid likelihood</h2>

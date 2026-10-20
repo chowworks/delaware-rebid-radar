@@ -53,7 +53,7 @@ export interface Contract {
   windowStart: string;
   windowEnd: string;
   status: WindowStatus;
-  daysToWindow: number; // negative when the window has already opened
+  daysToPredicted: number; // days from today to `predicted`; negative once it has passed
   likelihood: Likelihood;
   reasons: string[];
   priorAwards: number;

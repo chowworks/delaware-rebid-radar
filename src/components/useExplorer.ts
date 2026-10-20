@@ -14,7 +14,7 @@ function inTiming(c: Contract, timing: Timing): boolean {
   if (timing === "all") return true;
   if (timing === "open") return c.status === "open";
   const days = Number(timing);
-  return c.status === "open" || (c.daysToWindow > 0 && c.daysToWindow <= days);
+  return c.status === "open" || (c.daysToPredicted > 0 && c.daysToPredicted <= days);
 }
 
 function toCsv(rows: Contract[]): string {

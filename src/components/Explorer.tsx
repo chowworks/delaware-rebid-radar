@@ -40,10 +40,10 @@ export default function Explorer({ contracts, initialQuery = "" }: { contracts: 
           <label htmlFor="timing" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Predicted window</label>
           <select id="timing" value={timing} onChange={(e) => { setTiming(e.target.value as Timing); setShown(PAGE); }} className={select}>
             <option value="all">Any time</option>
-            <option value="open">Open now</option>
-            <option value="90">Open now or within 90 days</option>
-            <option value="180">Open now or within 6 months</option>
-            <option value="365">Open now or within 12 months</option>
+            <option value="open">Expected now</option>
+            <option value="90">Now or within 90 days</option>
+            <option value="180">Now or within 6 months</option>
+            <option value="365">Now or within 12 months</option>
           </select>
         </div>
         <div>
@@ -89,7 +89,7 @@ export default function Explorer({ contracts, initialQuery = "" }: { contracts: 
           </label>
           <label className="flex items-start gap-2">
             <input type="checkbox" className="mt-0.5 accent-navy-800" checked={hidePassed} onChange={(e) => { setHidePassed(e.target.checked); setShown(PAGE); }} />
-            Hide contracts whose window has passed
+            Hide contracts likely already posted
           </label>
         </div>
         <button type="button" onClick={reset} className="text-sm text-navy-700 underline">Reset filters</button>
@@ -145,7 +145,7 @@ export default function Explorer({ contracts, initialQuery = "" }: { contracts: 
                     <div className="shrink-0 rounded-md bg-navy-50 px-3 py-2 text-left sm:text-right">
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Predicted rebid window</p>
                       <p className="font-semibold text-navy-900 tabular">{fmtMonth(c.windowStart)} – {fmtMonth(c.windowEnd)}</p>
-                      <p className="text-xs text-slate-500">{windowCaption(c.status, c.daysToWindow)}</p>
+                      <p className="text-xs text-slate-500">{windowCaption(c.status, c.daysToPredicted)}</p>
                     </div>
                   </div>
                 </Link>
