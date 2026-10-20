@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "check": "tsx scripts/check-predictions.ts",
-    "check:live": "LIVE=1 tsx scripts/check-predictions.ts"
+    "check:live": "LIVE=1 tsx scripts/check-predictions.ts",
+    "calibrate": "tsx scripts/calibrate-lead-times.ts"
   },
   "dependencies": {
     "next": "^15.5.28",

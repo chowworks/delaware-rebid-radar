@@ -86,7 +86,7 @@ export default async function Home() {
                       <div className="flex shrink-0 flex-wrap items-center gap-2">
                         <LikelihoodBadge likelihood={c.likelihood} />
                         <StatusBadge status={c.status} />
-                        <span className="text-sm font-medium text-slate-700 tabular">{fmtMonth(c.windowStart)}</span>
+                        <span className="text-sm font-medium text-slate-700 tabular">likely {fmtMonth(c.predicted)}</span>
                       </div>
                     </Link>
                   </li>

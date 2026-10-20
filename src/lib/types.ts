@@ -48,7 +48,8 @@ export interface Contract {
   url: string | null;
   vendors: Vendor[];
   // Prediction
-  leadMonths: number;
+  leadMonths: number; // measured median for the category
+  predicted: string; // most likely posting date: expiration minus the median lead time
   windowStart: string;
   windowEnd: string;
   status: WindowStatus;
