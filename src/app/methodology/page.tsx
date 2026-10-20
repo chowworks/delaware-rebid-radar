@@ -33,7 +33,7 @@ export default function Methodology() {
           <ul className="mt-2 list-disc space-y-1 pl-5">
             <li><strong>High:</strong> a matching earlier award exists in the archive (same contract-number suffix, or a very similar title at the same agency). The need has recurred before.</li>
             <li><strong>Medium:</strong> no earlier award found, but nothing suggests a one-time purchase.</li>
-            <li><strong>Low:</strong> looks like a one-time project (for example a roof replacement), is a cooperative or GSA schedule contract that another government rebids, or has a term over 10 years.</li>
+            <li><strong>Low:</strong> looks like a one-time project (even if the agency has bought similar work before) (for example a roof replacement), is a cooperative or GSA schedule contract that another government rebids, or has a term over 10 years.</li>
           </ul>
         </section>
         <section className="rounded-lg border border-amber-200 bg-amber-50 p-4">

@@ -178,12 +178,16 @@ export function buildContracts(
     } else if ((termMonths !== null && termMonths > 240) || daysBetween(today, expiration) > 3650) {
       likelihood = "Low";
       reasons.push("Very long or open-ended term (an umbrella agreement, lease or public-private deal); the expiration date likely does not reflect real rebid timing.");
+    } else if (oneOff && !recurring) {
+      likelihood = "Low";
+      reasons.push(
+        priorAwards > 0
+          ? `Looks like a one-time project, so this contract itself will not be rebid. The agency has bought similar work before (${priorAwards} match${priorAwards > 1 ? "es" : ""} in the archive), so watch for new projects like it.`
+          : "Looks like a one-time project, which usually is not rebid.",
+      );
     } else if (priorAwards > 0) {
       likelihood = "High";
       reasons.push(`Matches ${priorAwards} earlier award${priorAwards > 1 ? "s" : ""} in the archive, so this looks like a recurring need.`);
-    } else if (oneOff && !recurring) {
-      likelihood = "Low";
-      reasons.push("Looks like a one-time project, which usually is not rebid.");
     } else if (recurring) {
       likelihood = "Medium";
       reasons.push("Title suggests an ongoing need, but no earlier award was found in the archive.");
