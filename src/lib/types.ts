@@ -63,4 +63,11 @@ export interface Dataset {
   contracts: Contract[];
   source: "live" | "sample";
   fetchedAt: string;
+  datasets: SourceDataset[]; // empty for the sample
+}
+
+export interface SourceDataset {
+  id: string; // data.delaware.gov dataset id
+  name: string;
+  updatedAt: string | null; // when the state last updated its rows
 }
