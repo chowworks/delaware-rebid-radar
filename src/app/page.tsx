@@ -1,103 +1,122 @@
-import Image from "next/image";
+import Link from "next/link";
+import { LikelihoodBadge, SampleBanner, StatusBadge } from "@/components/Badges";
+import { getDataset } from "@/lib/data";
+import { fmtMonth } from "@/lib/format";
 
-export default function Home() {
+export const revalidate = 86400;
+
+export default async function Home() {
+  const data = await getDataset();
+  const all = data.contracts;
+  const actionable = all.filter((c) => !c.cooperative && c.likelihood !== "Low");
+  const openNow = actionable.filter((c) => c.status === "open");
+  const next90 = actionable.filter((c) => c.status === "upcoming");
+  const next12 = actionable.filter((c) => c.status === "open" || (c.daysToWindow > 0 && c.daysToWindow <= 365));
+  const noDiverseIncumbent = next12.filter((c) => c.vendors.length > 0 && !c.vendors.some((v) => v.mwbe));
+  const spotlight = [...openNow, ...next90].slice(0, 6);
+
+  const byCategory = new Map<string, number>();
+  for (const c of next12) byCategory.set(c.category, (byCategory.get(c.category) ?? 0) + 1);
+  const topCategories = [...byCategory.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+  const stats = [
+    { label: "Current contracts tracked", value: all.length },
+    { label: "Rebid windows open now", value: openNow.length },
+    { label: "Opening in the next 90 days", value: next90.length },
+    { label: "Next 12 months, no OSD-certified incumbent", value: noDiverseIncumbent.length },
+  ];
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+    <>
+      {data.source === "sample" && <SampleBanner />}
+      <section className="bg-navy-900 text-white">
+        <div className="mx-auto max-w-7xl px-4 pb-14 pt-12 sm:px-6">
+          <p className="text-sm font-medium text-buff-400">For Delaware small, minority, women, veteran and disability-owned businesses</p>
+          <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight sm:text-5xl">
+            Know which state contracts are coming up for rebid, before the bid posts.
+          </h1>
+          <p className="mt-4 max-w-2xl text-navy-100/80">
+            We read Delaware&apos;s open contract data, estimate when each contract will be re-solicited,
+            and flag the ones likely to come back to market.
+          </p>
+          <form action="/opportunities" className="mt-8 flex max-w-2xl flex-col gap-2 sm:flex-row">
+            <label htmlFor="home-q" className="sr-only">Search contracts</label>
+            <input
+              id="home-q"
+              name="q"
+              placeholder="Search by service, product, agency or incumbent"
+              className="flex-1 rounded-md border-0 bg-white px-4 py-3 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-buff-400"
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            <button className="rounded-md bg-buff-400 px-5 py-3 font-semibold text-navy-950 hover:bg-buff-500">
+              Find opportunities
+            </button>
+          </form>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </section>
+
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <div className="-mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {stats.map((s) => (
+            <div key={s.label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-3xl font-semibold text-navy-900 tabular">{s.value.toLocaleString()}</p>
+              <p className="mt-1 text-sm text-slate-600">{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid gap-8 py-10 lg:grid-cols-[1fr_320px]">
+          <section>
+            <div className="mb-3 flex items-baseline justify-between">
+              <h2 className="text-lg font-semibold text-navy-900">Coming up next</h2>
+              <Link href="/opportunities" className="text-sm text-navy-700 hover:underline">See all →</Link>
+            </div>
+            {spotlight.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
+                No rebid windows open now or in the next 90 days.
+              </p>
+            ) : (
+              <ul className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">
+                {spotlight.map((c) => (
+                  <li key={c.id}>
+                    <Link href={`/opportunities/${encodeURIComponent(c.id)}`} className="flex flex-col gap-2 p-4 hover:bg-navy-50 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="font-medium text-navy-900">{c.title}</p>
+                        <p className="text-sm text-slate-500">{c.agencyName}</p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        <LikelihoodBadge likelihood={c.likelihood} />
+                        <StatusBadge status={c.status} />
+                        <span className="text-sm font-medium text-slate-700 tabular">{fmtMonth(c.windowStart)}</span>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <aside>
+            <h2 className="mb-3 text-lg font-semibold text-navy-900">Next 12 months by category</h2>
+            <ul className="space-y-2 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+              {topCategories.map(([cat, n]) => (
+                <li key={cat} className="flex items-center justify-between gap-2">
+                  <Link href={`/opportunities?q=${encodeURIComponent(cat)}`} className="text-slate-700 hover:text-navy-800 hover:underline">{cat}</Link>
+                  <span className="font-semibold text-navy-900 tabular">{n}</span>
+                </li>
+              ))}
+              {topCategories.length === 0 && <li className="text-slate-500">Nothing in the next 12 months.</li>}
+            </ul>
+            <div className="mt-4 rounded-lg bg-buff-100 p-4 text-sm text-navy-900">
+              <p className="font-semibold">Get certified before the bid posts</p>
+              <p className="mt-1">
+                OSD certification can take weeks. Start at{" "}
+                <a className="underline" href="https://osd.delaware.gov/">osd.delaware.gov</a> and register as a vendor on{" "}
+                <a className="underline" href="https://mmp.delaware.gov/">Delaware Bids &amp; Contracts</a>.
+              </p>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </>
   );
 }
