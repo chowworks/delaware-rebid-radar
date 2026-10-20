@@ -1,5 +1,6 @@
 import { IBM_Plex_Mono, Instrument_Serif, Public_Sans } from "next/font/google";
 import Link from "next/link";
+import DataSource from "@/components/DataSource";
 
 const sans = Public_Sans({ subsets: ["latin"], variable: "--font-public-sans" });
 const serif = Instrument_Serif({ subsets: ["latin"], weight: "400", variable: "--font-instrument-serif" });
@@ -42,6 +43,7 @@ export default function V2Layout({ children }: Readonly<{ children: React.ReactN
           </nav>
         </div>
       </header>
+      <DataSource variant="v2" />
       <main className="flex-1">{children}</main>
       <footer className="border-t border-line bg-paper">
         <div className="mx-auto grid max-w-7xl gap-6 px-4 py-10 text-sm sm:px-6 md:grid-cols-[1fr_2fr]">
