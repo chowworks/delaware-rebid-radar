@@ -39,11 +39,12 @@ export default async function Home() {
   for (const c of next12) byCategory.set(c.category, (byCategory.get(c.category) ?? 0) + 1);
   const topCategories = [...byCategory.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
 
+  // Lead with the number that matters most to OSD: upcoming work no certified firm holds today.
   const stats = [
-    { label: "Current contracts tracked", value: all.length },
+    { label: "Likely rebids in the next 12 months with no OSD-certified incumbent", value: noDiverseIncumbent.length },
     { label: "Rebid windows open now", value: openNow.length },
     { label: "Opening in the next 90 days", value: next90.length },
-    { label: "Next 12 months, no OSD-certified incumbent", value: noDiverseIncumbent.length },
+    { label: "Current contracts tracked", value: all.length },
   ];
 
   return (
