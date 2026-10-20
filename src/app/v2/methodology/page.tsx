@@ -55,7 +55,7 @@ export default function Methodology() {
               <li><strong>Low:</strong> looks like a one-time project (even if the agency has bought similar work before) (for example a roof replacement), is a cooperative or GSA schedule contract that another government rebids, or has a term over 10 years.</li>
             </ul>
           </section>
-          <section className="rounded-2xl border border-buff-300 bg-buff-50 p-6">
+          <section className="rounded-xl border border-buff-300 bg-buff-50 p-6">
             <h2 className="eyebrow text-buff-500">Known limits</h2>
             <ul className="mt-3 list-disc space-y-2 pl-5 text-ink-800 marker:text-buff-500">
               <li>The open data does not record remaining renewal options. An extension pushes the real rebid later than shown.</li>
