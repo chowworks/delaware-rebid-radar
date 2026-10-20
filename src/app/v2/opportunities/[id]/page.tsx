@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { LikelihoodBadge, SampleBanner, StatusBadge, Tag } from "@/components/v2/Badges";
+import { LikelihoodBadge, STATUS_TEXT, SampleBanner, StatusBadge, Tag } from "@/components/v2/Badges";
 import { getDataset } from "@/lib/data";
 import { fmtDate, fmtTerm, windowCaption } from "@/lib/format";
 import type { Contract } from "@/lib/types";
@@ -63,16 +63,22 @@ export default async function ContractPage({ params }: Params) {
     ["Typical lead time", `~${c.leadMonths} months before expiration (measured)`],
   ];
 
-  const card = "rounded-2xl border border-line bg-white p-6";
+  const card = "rounded-xl border border-line bg-white p-6";
 
   return (
     <>
       {sample && <SampleBanner />}
       <div className="wash border-b border-line">
         <div className="mx-auto max-w-6xl px-4 pb-10 pt-8 sm:px-6">
-          <Link href="/opportunities" className="text-sm text-ink-500 hover:text-de-700">← All opportunities</Link>
-          <p className="mt-8 font-mono text-xs text-de-600">{c.number || "No contract number"}</p>
-          <h1 className="display mt-2 max-w-4xl text-4xl text-ink-900 sm:text-6xl">{c.title}</h1>
+          <nav className="text-[14px] text-ink-500">
+            <Link href="/" className="hover:text-ink-900">Home</Link>
+            <span className="mx-2 text-ink-400">/</span>
+            <Link href="/opportunities" className="hover:text-ink-900">Opportunities</Link>
+            <span className="mx-2 text-ink-400">/</span>
+            <span className="text-ink-400">{c.number || "Contract"}</span>
+          </nav>
+          <p className="eyebrow mt-8 text-ink-400">{c.category} · {c.agency}</p>
+          <h1 className="display mt-3 max-w-4xl text-[44px] text-ink-900 sm:text-[58px]">{c.title}</h1>
           <p className="mt-3 text-lg text-ink-500">{c.agencyName}</p>
           <div className="mt-5 flex flex-wrap items-center gap-2">
             <StatusBadge status={c.status} />
@@ -90,7 +96,7 @@ export default async function ContractPage({ params }: Params) {
           <div className="space-y-6">
             <section className={`${card} shadow-[0_12px_40px_rgb(11_26_51/0.06)]`}>
               <h2 className="eyebrow text-ink-400">Most likely rebid posting</h2>
-              <p className="display mt-3 text-4xl text-ink-900 tabular">Around {fmtDate(c.predicted)}</p>
+              <p className={`mt-3 text-[34px] font-semibold leading-none tracking-tight tabular ${STATUS_TEXT[c.status]}`}>{fmtDate(c.predicted)}</p>
               <p className="mt-2 text-sm text-ink-700">{windowCaption(c.status, c.daysToPredicted)}</p>
               <p className="mb-6 text-sm text-ink-500">
                 Half of past rebids like this posted between <span className="font-mono">{fmtDate(c.windowStart)}</span> and{" "}
@@ -137,7 +143,7 @@ export default async function ContractPage({ params }: Params) {
           </div>
 
           <aside className="space-y-4 md:sticky md:top-20 md:self-start">
-            <dl className="overflow-hidden rounded-2xl border border-line bg-white text-sm">
+            <dl className="overflow-hidden rounded-xl border border-line bg-white text-sm">
               {facts.map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-3 border-b border-line px-5 py-3 last:border-0">
                   <dt className="text-ink-500">{k}</dt>
@@ -150,7 +156,7 @@ export default async function ContractPage({ params }: Params) {
                 href={c.url}
                 target="_blank"
                 rel="noreferrer"
-                className="block rounded-lg bg-de-600 px-4 py-3 text-center text-sm font-medium text-white hover:bg-de-700"
+                className="block rounded-md bg-de-600 px-4 py-3 text-center text-sm font-medium text-white hover:bg-de-700"
               >
                 View on Delaware Bids &amp; Contracts ↗
               </a>

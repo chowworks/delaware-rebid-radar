@@ -15,6 +15,13 @@ export const STATUS_DOT: Record<WindowStatus, string> = {
   later: "bg-ink-400",
 };
 
+export const STATUS_TEXT: Record<WindowStatus, string> = {
+  open: "text-green-700",
+  upcoming: "text-amber-700",
+  closing: "text-rose-700",
+  later: "text-ink-500",
+};
+
 const LIKELIHOOD_STYLE: Record<Likelihood, string> = {
   High: "bg-de-600 text-white",
   Medium: "bg-de-100 text-de-700",
@@ -23,7 +30,7 @@ const LIKELIHOOD_STYLE: Record<Likelihood, string> = {
 
 export function StatusBadge({ status }: { status: WindowStatus }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[status]}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[status]}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[status]}`} />
       {STATUS_LABEL[status]}
     </span>
@@ -44,7 +51,7 @@ export function LikelihoodMeter({ likelihood }: { likelihood: Likelihood }) {
 
 export function LikelihoodBadge({ likelihood }: { likelihood: Likelihood }) {
   return (
-    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${LIKELIHOOD_STYLE[likelihood]}`}>
+    <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${LIKELIHOOD_STYLE[likelihood]}`}>
       {likelihood} rebid likelihood
     </span>
   );
@@ -52,9 +59,7 @@ export function LikelihoodBadge({ likelihood }: { likelihood: Likelihood }) {
 
 export function Tag({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center rounded border border-line bg-white px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-500">
-      {children}
-    </span>
+    <span className="tag bg-white">{children}</span>
   );
 }
 
