@@ -14,8 +14,10 @@ export const DATASETS = {
   vendors: "h9bb-iyu6",
 } as const;
 
-// Data refreshes weekly upstream; re-pulling daily is plenty.
+// Data refreshes weekly upstream; re-pulling daily is plenty. A daily cron
+// (src/app/api/refresh) also purges this tag so the site never waits on a visit.
 const REVALIDATE_SECONDS = 60 * 60 * 24;
+export const DATA_TAG = "socrata";
 
 async function soda<T>(id: string, select: string): Promise<T[]> {
   const params = new URLSearchParams({ $select: select, $limit: "50000" });
@@ -23,7 +25,7 @@ async function soda<T>(id: string, select: string): Promise<T[]> {
   if (process.env.SOCRATA_APP_TOKEN) headers["X-App-Token"] = process.env.SOCRATA_APP_TOKEN;
   const res = await fetch(`${BASE}/${id}.json?${params}`, {
     headers,
-    next: { revalidate: REVALIDATE_SECONDS },
+    next: { revalidate: REVALIDATE_SECONDS, tags: [DATA_TAG] },
     signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) throw new Error(`${id}: HTTP ${res.status}`);
@@ -35,7 +37,7 @@ async function soda<T>(id: string, select: string): Promise<T[]> {
 async function rowsUpdatedAt(id: string): Promise<string | null> {
   try {
     const res = await fetch(`${BASE.replace(/\/resource$/, "/api/views")}/${id}.json`, {
-      next: { revalidate: REVALIDATE_SECONDS },
+      next: { revalidate: REVALIDATE_SECONDS, tags: [DATA_TAG] },
       signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) return null;

@@ -45,14 +45,18 @@ npm run check:live           # same against live data
 npm run calibrate            # re-measure lead times from live bid data
 ```
 
-Live data is fetched server-side and cached for 24 hours (ISR). If the API is unreachable the
-app falls back to the sample and shows a banner.
+Live data is fetched server-side and cached for 24 hours (ISR). A Vercel Cron job hits
+`/api/refresh` daily at 10:00 UTC (6am Eastern) to purge that cache and rebuild the home pages,
+so the site stays current even when nobody visits. If the API is unreachable the app falls back
+to the sample and shows a banner.
 
 ## Deploy (Vercel)
 
 1. Import this repo in Vercel (framework preset: Next.js, no build settings to change).
-2. Optional: set `SOCRATA_APP_TOKEN` to raise API rate limits.
-3. Deploy.
+2. Set `CRON_SECRET` to any long random string. Vercel sends it with the daily refresh, and
+   `/api/refresh` rejects requests without it.
+3. Optional: set `SOCRATA_APP_TOKEN` to raise API rate limits.
+4. Deploy.
 
 ## Designs
 
