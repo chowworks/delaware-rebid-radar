@@ -219,6 +219,7 @@ export function departmentSummaries(year: Year) {
         smallTotal: by.total,
         allTotal: mine.reduce((s, p) => s + p.amount, 0),
         vendorCount: new Set(small.map((p) => p.vendor)).size,
+        divisionNames: [...new Set(mine.map((p) => divisionName(p.div)))],
         shares: by,
       };
     })
@@ -297,6 +298,7 @@ export function categorySummaries(year: Year, smallOnly = false) {
         total,
         vendorCount: list.length,
         top: vendors[top[0]],
+        topNames: [...m].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([v]) => vendors[v].name),
         topShare: top[1] / total,
         top3Share: list.slice(0, 3).reduce((s, v) => s + v, 0) / total,
         // Herfindahl index on a 0-10,000 scale; above 2,500 is "highly concentrated".
@@ -355,38 +357,76 @@ export function checkbookCsv(opts: { department?: string; vendor?: string; accou
   return `https://data.delaware.gov/resource/7bip-nb4g.csv?${params}`;
 }
 
-// Departments > divisions > top vendors, for browsing small purchases in place.
-export function departmentTree(year: Year, vendorsPerDivision = 8) {
-  const { payments, vendors } = model();
-  const byDept = new Map<number, Map<number, Map<number, number>>>();
+// One department's divisions and their top vendors, for browsing small
+// purchases in place. Plain data: it goes to the browser as JSON.
+export interface DivisionBranch {
+  name: string;
+  slug: string;
+  total: number;
+  vendorCount: number;
+  vendors: { name: string; size: VendorSize; osd: boolean; onContract: boolean; total: number }[];
+}
+
+export function departmentDivisions(slug: string, year: Year, vendorsPerDivision = 8): DivisionBranch[] | null {
+  const { payments, vendors, departments } = model();
+  const dept = departments.find((d) => d.slug === slug);
+  if (!dept) return null;
+  const divs = new Map<number, Map<number, number>>();
   for (const p of payments) {
-    if (!p.small || !inYear(p, year)) continue;
-    const divs = byDept.get(p.dept) ?? new Map<number, Map<number, number>>();
+    if (p.dept !== dept.index || !p.small || !inYear(p, year)) continue;
     const vs = divs.get(p.div) ?? new Map<number, number>();
     vs.set(p.vendor, (vs.get(p.vendor) ?? 0) + p.amount);
     divs.set(p.div, vs);
-    byDept.set(p.dept, divs);
   }
-  const tree = new Map<number, { name: string; slug: string; total: number; vendorCount: number; vendors: { vendor: VendorInfo; total: number }[] }[]>();
-  for (const [dept, divs] of byDept) {
-    tree.set(
-      dept,
-      [...divs]
-        .map(([div, vs]) => {
-          const list = [...vs].filter(([, t]) => t > 0).sort((a, b) => b[1] - a[1]);
-          return {
-            name: divisionName(div),
-            slug: slugify(divisionName(div)),
-            total: list.reduce((s, [, t]) => s + t, 0),
-            vendorCount: list.length,
-            vendors: list.slice(0, vendorsPerDivision).map(([v, total]) => ({ vendor: vendors[v], total })),
-          };
-        })
-        .filter((d) => d.total > 0)
-        .sort((a, b) => b.total - a.total),
-    );
+  return [...divs]
+    .map(([div, vs]) => {
+      const list = [...vs].filter(([, t]) => t > 0).sort((a, b) => b[1] - a[1]);
+      return {
+        name: divisionName(div),
+        slug: slugify(divisionName(div)),
+        total: list.reduce((s, [, t]) => s + t, 0),
+        vendorCount: list.length,
+        vendors: list.slice(0, vendorsPerDivision).map(([v, total]) => ({
+          name: vendors[v].name,
+          size: vendors[v].size,
+          osd: vendors[v].osd,
+          onContract: vendors[v].contracts.length > 0,
+          total,
+        })),
+      };
+    })
+    .filter((d) => d.total > 0)
+    .sort((a, b) => b.total - a.total);
+}
+
+// One category's top vendors, for browsing a category in place on the
+// category tabs. Plain data: it goes to the browser as JSON.
+export interface CategoryBranch {
+  total: number;
+  vendorCount: number;
+  vendors: DivisionBranch["vendors"];
+}
+
+export function categoryVendors(account: string, year: Year, smallOnly = false, limit = 15): CategoryBranch | null {
+  if (!ACCOUNTS[account]) return null;
+  const { payments, vendors } = model();
+  const by = new Map<number, number>();
+  for (const p of payments) {
+    if (p.account !== account || !inYear(p, year) || (smallOnly && !p.small)) continue;
+    by.set(p.vendor, (by.get(p.vendor) ?? 0) + p.amount);
   }
-  return tree;
+  const list = [...by].filter(([, t]) => t > 0).sort((a, b) => b[1] - a[1]);
+  return {
+    total: list.reduce((s, [, t]) => s + t, 0),
+    vendorCount: list.length,
+    vendors: list.slice(0, limit).map(([v, total]) => ({
+      name: vendors[v].name,
+      size: vendors[v].size,
+      osd: vendors[v].osd,
+      onContract: vendors[v].contracts.length > 0,
+      total,
+    })),
+  };
 }
 
 // Vendors with a size on federal record, largest state spend first, for the

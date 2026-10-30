@@ -7,8 +7,6 @@ import {
   checkbookCsv,
   departmentDetail,
   departmentSummaries,
-  departmentTree,
-  sizedVendors,
   snapshotInfo,
   emptyShares,
   sizeSourceDate,
@@ -18,7 +16,10 @@ import {
   type Year,
 } from "@/lib/spending";
 import { THRESHOLDS, THRESHOLD_SOURCE, type Tier } from "@/lib/spending-rules";
+import CatRow from "./CatRow";
+import DeptRow from "./DeptRow";
 import Modal from "./Modal";
+import QuickFilter from "./QuickFilter";
 import { THEMES, type Theme, type Variant } from "./theme";
 import VendorSizeSearch from "./VendorSizeSearch";
 
@@ -100,6 +101,11 @@ function Badge({ className, children, title }: { className: string; children: Re
 }
 
 const DEPT_COLS = "grid-cols-[minmax(0,1fr)_12rem_4.5rem_4.5rem_4.5rem_3.5rem]";
+const CAT_COLS = "grid-cols-[minmax(0,1.4fr)_10rem_minmax(0,1fr)_4.5rem_4.5rem_4.5rem_8.5rem]";
+
+function Filter({ t, target, placeholder, noun }: { t: Theme; target: string; placeholder: string; noun: string }) {
+  return <QuickFilter target={target} placeholder={placeholder} noun={noun} classes={{ input: `${t.border} bg-white ${t.text}`, muted: t.muted }} />;
+}
 
 const SIZE_LABEL = { large: "Large business", small: "Small business", nonprofit: "Nonprofit", unknown: "Size unknown" } as const;
 
@@ -162,87 +168,75 @@ function SizeSplit({ t, s }: { t: Theme; s: Shares }) {
   );
 }
 
-// What "small purchases" means, in one line, with the full limits, the method
-// and the vendor size list one click away in dialogs.
+// What "small purchases" means, in one line. "How this works" opens the
+// limits and the method in place, below the strip.
 function SmallPurchaseNote({ t }: { t: Theme }) {
   const tiers: Tier[] = ["goods", "prof", "works"];
-  const trigger = `inline-flex items-center gap-1.5 whitespace-nowrap font-medium underline underline-offset-2 ${t.text}`;
-  const icon = <span aria-hidden="true" className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-current text-[10px] font-semibold">i</span>;
+  const k = (n: number) => fmtMoney(n);
   return (
-    <div className={`${t.note} px-4 py-3 text-sm leading-relaxed`}>
-      <p>
-        <strong>Small purchases</strong> are buys under Delaware&apos;s open-market limits ({fmtMoney(THRESHOLDS.goods.openMarket)} goods
-        and services, {fmtMoney(THRESHOLDS.prof.openMarket)} professional services, {fmtMoney(THRESHOLDS.works.openMarket)} public
-        works) that need no public bid. Only those are shown here; larger purchases are bid publicly on{" "}
-        <a className={t.link} href={OPEN_BIDS}>MMP</a>. Which payments count is our estimate.
-      </p>
-      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
-        <Modal label={<>{icon}How this works</>} title="How small purchases work" buttonClass={trigger} panelClass={t.popover}>
-          <div className={`space-y-6 text-sm leading-relaxed ${t.text}`}>
-            <section>
-              <h3 className={t.h3}>Delaware&apos;s purchase limits</h3>
-              <div className="mt-3 overflow-x-auto">
-                <table className="w-full min-w-[30rem] text-left text-[13px]">
-                  <thead>
-                    <tr className={`border-b ${t.border}`}>
-                      <th className="py-2 pr-3 font-medium">Type of purchase</th>
-                      <th className="py-2 pr-3 font-medium">Open market, no bid</th>
-                      <th className="py-2 pr-3 font-medium">Quotes or letter bids</th>
-                      <th className="py-2 font-medium">Formal bid or RFP</th>
+    <details className="group">
+      <summary className={`${t.note} flex cursor-pointer list-none items-center gap-3 px-4 py-2.5 text-sm [&::-webkit-details-marker]:hidden`}>
+        {INFO_ICON}
+        <span className="min-w-0 flex-1">
+          Shows only purchases under the no-bid limits: <strong>{k(THRESHOLDS.goods.openMarket)}</strong> goods ·{" "}
+          <strong>{k(THRESHOLDS.prof.openMarket)}</strong> professional services · <strong>{k(THRESHOLDS.works.openMarket)}</strong>{" "}
+          public works. Estimated from payment records.
+        </span>
+        <span className="whitespace-nowrap font-semibold underline underline-offset-2">
+          How this works{" "}
+          <svg viewBox="0 0 12 12" aria-hidden="true" className="inline h-3 w-3 transition group-open:rotate-180">
+            <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+      </summary>
+      <div className={`${t.card} mt-2 grid gap-8 p-5 text-sm leading-relaxed md:grid-cols-[1.3fr_1fr] ${t.text}`}>
+        <div className="min-w-0">
+          <p className="font-semibold">The limits</p>
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full min-w-[26rem] text-left text-[13px]">
+              <thead className={t.muted}>
+                <tr>
+                  <th className="py-1.5 pr-3 font-medium">Type</th>
+                  <th className="py-1.5 pr-3 font-medium">No bid</th>
+                  <th className="py-1.5 pr-3 font-medium">Quotes</th>
+                  <th className="py-1.5 font-medium">Formal bid or RFP</th>
+                </tr>
+              </thead>
+              <tbody className={`divide-y ${t.divide} border-t ${t.border}`}>
+                {tiers.map((tier) => {
+                  const th = THRESHOLDS[tier];
+                  const formalAt = Number(th.steps[2][0].replace(/[^0-9]/g, ""));
+                  return (
+                    <tr key={tier}>
+                      <td className="py-2 pr-3">{th.label}</td>
+                      <td className="py-2 pr-3 font-semibold tabular">&lt; {k(th.openMarket)}</td>
+                      <td className="py-2 pr-3 tabular">{k(th.openMarket)}–{k(formalAt)}</td>
+                      <td className="py-2 tabular">{k(formalAt)}+</td>
                     </tr>
-                  </thead>
-                  <tbody className={`divide-y ${t.divide}`}>
-                    {tiers.map((k) => {
-                      const th = THRESHOLDS[k];
-                      return (
-                        <tr key={k}>
-                          <td className="py-2.5 pr-3 align-top">
-                            <span className="font-medium">{th.label}</span>
-                            <span className={`block text-xs ${t.muted}`}>{th.basis}</span>
-                          </td>
-                          {th.steps.map(([range, rule]) => (
-                            <td key={range} className="py-2.5 pr-3 align-top">
-                              <span className="font-semibold tabular">{range}</span>
-                              <span className={`block text-xs ${t.muted}`}>{rule}</span>
-                            </td>
-                          ))}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <p className={`mt-2 text-xs ${t.muted}`}>
-                Source: Division of Accounting, <a className={t.link} href={THRESHOLD_SOURCE}>small purchase rules</a> (29 Del. C. ch. 69).
-              </p>
-            </section>
-            <section>
-              <h3 className={t.h3}>What this page shows</h3>
-              <p className="mt-2">
-                Only the first column: purchases small enough to skip a public bid. Anything bigger was bid or put out as an
-                RFP, and its record is public on <a className={t.link} href={OPEN_BIDS}>MMP</a>.
-              </p>
-            </section>
-            <section>
-              <h3 className={t.h3}>How we pick out small purchases</h3>
-              <p className="mt-2">
-                Payment records don&apos;t say which contract or purchase order a payment belongs to. So we add up what each
-                department paid each vendor in a fiscal year, per type of purchase, and count it only when that total stays
-                under the open-market limit and the vendor isn&apos;t on a current state contract. A run of small payments
-                that adds up past the limit is left out.
-              </p>
-            </section>
-            <section>
-              <h3 className={t.h3}>Worth knowing</h3>
-              <p className="mt-2">
-                For open-market purchases, agencies must ask at least one{" "}
-                <a className={t.link} href={OSD_DIRECTORY}>certified diverse vendor</a> for a quote.
-              </p>
-            </section>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        </Modal>
+          <p className={`mt-2 text-xs ${t.muted}`}>
+            Goods limits are a yearly total per agency; professional services and public works are per contract, and
+            contracts can&apos;t be split to stay under. Source:{" "}
+            <a className={t.link} href={THRESHOLD_SOURCE}>Division of Accounting small purchase rules</a>.
+          </p>
+        </div>
+        <div className="min-w-0">
+          <p className="font-semibold">How we estimate it</p>
+          <p className="mt-2">
+            Payment records don&apos;t say which contract a payment belongs to. We total what each department paid each
+            vendor per year and type of purchase, and count it only if that stays under the no-bid limit and the vendor
+            isn&apos;t on a state contract. Bigger purchases are bid publicly on <a className={t.link} href={OPEN_BIDS}>MMP</a>.
+          </p>
+          <p className={`mt-3 text-xs ${t.muted}`}>
+            Agencies must ask at least one <a className={t.link} href={OSD_DIRECTORY}>certified diverse firm</a> for a quote on these buys.
+          </p>
+        </div>
       </div>
-    </div>
+    </details>
   );
 }
 
@@ -268,7 +262,6 @@ function SizeInfo({ t }: { t: Theme }) {
           </ul>
           <div className="mt-5">
             <VendorSizeSearch
-              vendors={sizedVendors()}
               classes={{
                 input: `${t.border} bg-white ${t.text}`,
                 chip: t.tab,
@@ -317,61 +310,67 @@ function DiverseInfo({ t }: { t: Theme }) {
   );
 }
 
-// The headline numbers: how much, and who got it.
-function SpendSummary({ t, label, total, all, allLabel, shares, extras = [] }: { t: Theme; label: string; total: number; all: number; allLabel: string; shares: Shares; extras?: [string, string][] }) {
-  const parts = [
-    { key: "large", color: t.barLarge, value: shares.large },
-    { key: "small", color: t.bar, value: shares.small },
-    { key: "nonprofit", color: t.barNonprofit, value: shares.nonprofit },
-    { key: "unknown", color: t.barUnknown, value: shares.unknown },
+// The headline numbers: how much, who got it, and one line saying it plainly.
+function SpendSummary({ t, label, total, all, allLabel, shares, extras = [], subject, noun, period }: { t: Theme; label: string; total: number; all: number; allLabel: string; shares: Shares; extras?: [string, string][]; subject: string; noun: string; period: string }) {
+  const rows = [
+    { key: "large", color: t.barLarge, value: shares.large, info: null },
+    { key: "small", color: t.bar, value: shares.small, info: null },
+    { key: "nonprofit", color: t.barNonprofit, value: shares.nonprofit, info: null },
+    { key: "unknown", color: t.barUnknown, value: shares.unknown, info: null },
+    { key: "osd", color: "bg-emerald-600", value: shares.osd, info: <DiverseInfo t={t} /> },
   ] as const;
+  const label2 = { ...SIZE_LABEL, osd: "Diverse-owned" };
+  const max = Math.max(...rows.map((r) => r.value), 1);
+  const smallOrNonprofit = shares.small + shares.nonprofit;
   return (
-    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-      <div className={`${t.card} flex flex-col p-5`}>
-        <p className={t.h3}>{label}</p>
-        <p className={`mt-2 ${t.stat} text-4xl`}>{fmtMoney(total)}</p>
-        <div className="mt-4">
-          <Bar t={t} value={total} max={all} />
-          <p className={`mt-1.5 text-xs ${t.muted}`}>{fmtPct(total, all)} of {fmtMoney(all)} {allLabel}</p>
+    <div className={`${t.card} overflow-hidden`}>
+      <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <div className={`flex flex-col p-5 lg:border-r ${t.border}`}>
+          <p className={t.h3}>{label}</p>
+          <p className={`mt-2 ${t.stat} text-4xl`}>{fmtMoney(total)}</p>
+          <div className="mt-4">
+            <Bar t={t} value={total} max={all} />
+            <p className={`mt-1.5 text-xs ${t.muted}`}>{fmtPct(total, all)} of {fmtMoney(all)} {allLabel}</p>
+          </div>
+          {extras.length > 0 && (
+            <dl className={`mt-auto grid grid-cols-2 gap-3 border-t ${t.border} pt-4`}>
+              {extras.map(([v, l]) => (
+                <div key={l}>
+                  <dt className={`text-xs ${t.muted}`}>{l}</dt>
+                  <dd className={`text-lg font-semibold tabular ${t.text}`}>{v}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
         </div>
-        {extras.length > 0 && (
-          <dl className={`mt-auto grid grid-cols-2 gap-3 border-t ${t.border} pt-4`}>
-            {extras.map(([v, l]) => (
-              <div key={l}>
-                <dt className={`text-xs ${t.muted}`}>{l}</dt>
-                <dd className={`text-lg font-semibold tabular ${t.text}`}>{v}</dd>
-              </div>
+        <div className={`border-t p-5 lg:border-t-0 ${t.border}`}>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className={t.h3}>Who got it</p>
+            <SizeInfo t={t} />
+          </div>
+          <ul className="mt-3">
+            {rows.map((r, i) => (
+              <li key={r.key} className={`grid grid-cols-[minmax(0,10rem)_1fr_3rem_4rem] sm:grid-cols-[minmax(0,12rem)_1fr_3.5rem_4.5rem] items-center gap-3 py-2 text-sm ${i ? `border-t ${t.border}` : ""}`}>
+                <span className={`flex min-w-0 items-center gap-2 ${t.text}`}>
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-sm ${r.color}`} />
+                  <span className="truncate">{label2[r.key]}</span>
+                  {r.info}
+                </span>
+                <span className={`h-2 overflow-hidden rounded-full ${t.barTrack}`}>
+                  <span className={`block h-full rounded-full ${r.color}`} style={{ width: `${(r.value / max) * 100}%` }} />
+                </span>
+                <span className={`text-right font-semibold tabular ${t.text}`}>{fmtPct(r.value, shares.total)}</span>
+                <span className={`text-right text-xs tabular ${t.muted}`}>{fmtMoney(r.value)}</span>
+              </li>
             ))}
-          </dl>
-        )}
-      </div>
-      <div className={`${t.card} p-5`}>
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <p className={t.h3}>Who got it</p>
-          <SizeInfo t={t} />
-        </div>
-        <div className={`mt-4 flex h-4 w-full overflow-hidden rounded-md ${t.barTrack}`}>
-          {parts.map((p) => (
-            <div key={p.key} className={p.color} style={{ width: `${shares.total ? (p.value / shares.total) * 100 : 0}%` }} />
-          ))}
-        </div>
-        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {parts.map((p) => (
-            <div key={p.key}>
-              <p className={`flex items-center gap-1.5 text-xs ${t.muted}`}><span className={`h-2.5 w-2.5 rounded-sm ${p.color}`} />{SIZE_LABEL[p.key]}</p>
-              <p className={`mt-1 text-2xl font-semibold tabular ${t.text}`}>{fmtPct(p.value, shares.total)}</p>
-              <p className={`text-xs tabular ${t.muted}`}>{fmtMoney(p.value)}</p>
-            </div>
-          ))}
-        </div>
-        <div className={`mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-t ${t.border} pt-3 text-sm ${t.text}`}>
-          <span className="h-2.5 w-2.5 rounded-sm bg-emerald-600" />
-          <span>Certified diverse-owned firms</span>
-          <DiverseInfo t={t} />
-          <span className="ml-auto font-semibold tabular">{fmtPct(shares.osd, shares.total)}</span>
-          <span className={`text-xs tabular ${t.muted}`}>{fmtMoney(shares.osd)}</span>
+          </ul>
         </div>
       </div>
+      <p className={`border-t ${t.border} px-5 py-3 text-sm ${t.text}`}>
+        {subject} made <strong>{fmtMoney(total)}</strong> in {noun} ({period}). <strong>{fmtPct(shares.osd, shares.total)}</strong> went to
+        certified diverse-owned firms, and <strong>{fmtMoney(smallOrNonprofit)}</strong> ({fmtPct(smallOrNonprofit, shares.total)}) to vendors
+        we could confirm as small businesses or nonprofits.
+      </p>
     </div>
   );
 }
@@ -551,7 +550,6 @@ function ByYear({ t, rows, field }: { t: Theme; rows: { fy: number; [k: string]:
 export function SpendingHome({ variant, year }: { variant: Variant; year: Year }) {
   const t = THEMES[variant];
   const depts = departmentSummaries(year);
-  const tree = departmentTree(year);
   const total = depts.reduce((s, d) => s + d.smallTotal, 0);
   const all = depts.reduce((s, d) => s + d.allTotal, 0);
   const shares = depts.reduce<Shares>(
@@ -577,7 +575,7 @@ export function SpendingHome({ variant, year }: { variant: Variant; year: Year }
         <div className="mt-5"><YearTabs t={t} year={year} path="/spending" /></div>
 
         <div className="mt-6">
-          <SpendSummary t={t} label={`Small purchases · ${yearLabel(year)}`} total={total} all={all} allLabel="in all purchases, including bid contracts" shares={shares} />
+          <SpendSummary t={t} label={`Small purchases · ${yearLabel(year)}`} total={total} all={all} allLabel="in all purchases, including bid contracts" shares={shares} subject="Departments" noun="small purchases" period={yearPhrase(year)} />
         </div>
 
         <section className="mt-10">
@@ -585,7 +583,8 @@ export function SpendingHome({ variant, year }: { variant: Variant; year: Year }
           <p className={`mt-1 text-sm ${t.muted}`}>
             Ranked by small purchases, {yearPhrase(year)}. Open a department for its divisions, and a division for its top vendors.
           </p>
-          <div className={`${t.card} mt-4 overflow-x-auto`}>
+          <div className="mt-4"><Filter t={t} target="dept-list" placeholder="Filter by department or division" noun="departments" /></div>
+          <div id="dept-list" className={`${t.card} mt-3 overflow-x-auto`}>
             <div className="min-w-[680px]">
               <div className={`grid ${DEPT_COLS} gap-x-4 border-b ${t.border} px-4 py-2 ${t.th}`}>
                 <span>Department</span>
@@ -597,61 +596,29 @@ export function SpendingHome({ variant, year }: { variant: Variant; year: Year }
               </div>
               <div className={`divide-y ${t.divide}`}>
                 {depts.map((d) => (
-                  <details key={d.slug} className="group/dept">
-                    <summary className={`grid ${DEPT_COLS} cursor-pointer list-none items-center gap-x-4 px-4 py-3 text-sm ${t.rowHover} [&::-webkit-details-marker]:hidden`}>
-                      <span className={`flex min-w-0 items-center gap-2 font-medium ${t.text}`}>
-                        <span className={`text-[10px] ${t.muted} transition group-open/dept:rotate-90`} aria-hidden="true">▶</span>
-                        <span className="truncate">{d.name}</span>
-                      </span>
-                      <span>
-                        <span className={`block font-semibold tabular ${t.text}`}>{fmtMoney(d.smallTotal)}</span>
-                        <span className="mt-1 block"><Bar t={t} value={d.smallTotal} max={max} /></span>
-                      </span>
-                      <span className={`text-right tabular ${t.text}`}>{d.vendorCount.toLocaleString()}</span>
-                      <span className={`text-right tabular ${t.text}`}>{fmtPct(d.shares.large, d.shares.total)}</span>
-                      <span className={`text-right tabular ${t.text}`}>{fmtPct(d.shares.small, d.shares.total)}</span>
-                      <span className={`text-right tabular ${t.text}`}>{fmtPct(d.shares.osd, d.shares.total)}</span>
-                    </summary>
-                    <div className={`border-t ${t.border} pb-2 pl-8 pr-4 pt-1`}>
-                      {(tree.get(d.index) ?? []).map((div) => (
-                        <details key={div.slug} className="group/div">
-                          <summary className={`grid grid-cols-[minmax(0,1fr)_14rem] cursor-pointer list-none items-center gap-x-4 rounded px-2 py-2 text-sm ${t.rowHover} [&::-webkit-details-marker]:hidden`}>
-                            <span className={`flex min-w-0 items-center gap-2 ${t.text}`}>
-                              <span className={`text-[9px] ${t.muted} transition group-open/div:rotate-90`} aria-hidden="true">▶</span>
-                              <span className="truncate">{div.name}</span>
-                              <span className={`shrink-0 text-xs ${t.muted}`}>{div.vendorCount} vendors</span>
-                            </span>
-                            <span className="grid grid-cols-[1fr_4.5rem] items-center gap-2">
-                              <Bar t={t} value={div.total} max={d.smallTotal} />
-                              <span className={`text-right text-xs tabular ${t.text}`}>{fmtMoney(div.total)}</span>
-                            </span>
-                          </summary>
-                          <ul className="mb-2 ml-6 mr-2 space-y-1.5 py-1 text-sm">
-                            {div.vendors.map((v) => (
-                              <li key={v.vendor.slug} className="grid grid-cols-[minmax(0,1fr)_14rem] items-center gap-x-4">
-                                <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-                                  <span className={`truncate ${t.text}`}>{v.vendor.name}</span>
-                                  <VendorBadges t={t} vendor={v.vendor} />
-                                </span>
-                                <span className="grid grid-cols-[1fr_4.5rem] items-center gap-2">
-                                  <Bar t={t} value={v.total} max={div.vendors[0].total} className={v.vendor.size === "large" ? t.barLarge : undefined} />
-                                  <span className={`text-right text-xs tabular ${t.muted}`}>{fmtMoney(v.total)}</span>
-                                </span>
-                              </li>
-                            ))}
-                            <li className="pt-1 text-xs">
-                              <Link className={t.link} href={href(`/spending/${d.slug}`, { fy: year, division: div.slug })}>
-                                {div.vendorCount > div.vendors.length ? `All ${div.vendorCount} vendors, by year and with payment records` : "Vendor details and payment records"}
-                              </Link>
-                            </li>
-                          </ul>
-                        </details>
-                      ))}
-                      <p className="px-2 pt-2 text-xs">
-                        <Link className={t.link} href={href(`/spending/${d.slug}`, { fy: year })}>Full {d.name} page</Link>
-                      </p>
-                    </div>
-                  </details>
+                  <DeptRow
+                    key={d.slug}
+                    t={t}
+                    slug={d.slug}
+                    name={d.name}
+                    year={year}
+                    total={d.smallTotal}
+                    filterText={[d.name, ...d.divisionNames].join(" | ")}
+                    summaryClass={`grid ${DEPT_COLS} cursor-pointer list-none items-center gap-x-4 px-4 py-3 text-sm ${t.rowHover} [&::-webkit-details-marker]:hidden`}
+                  >
+                    <span className={`flex min-w-0 items-center gap-2 font-medium ${t.text}`}>
+                      <span className={`text-[10px] ${t.muted} transition group-open/dept:rotate-90`} aria-hidden="true">▶</span>
+                      <span className="truncate">{d.name}</span>
+                    </span>
+                    <span>
+                      <span className={`block font-semibold tabular ${t.text}`}>{fmtMoney(d.smallTotal)}</span>
+                      <span className="mt-1 block"><Bar t={t} value={d.smallTotal} max={max} /></span>
+                    </span>
+                    <span className={`text-right tabular ${t.text}`}>{d.vendorCount.toLocaleString()}</span>
+                    <span className={`text-right tabular ${t.text}`}>{fmtPct(d.shares.large, d.shares.total)}</span>
+                    <span className={`text-right tabular ${t.text}`}>{fmtPct(d.shares.small, d.shares.total)}</span>
+                    <span className={`text-right tabular ${t.text}`}>{fmtPct(d.shares.osd, d.shares.total)}</span>
+                  </DeptRow>
                 ))}
               </div>
             </div>
@@ -698,6 +665,9 @@ export function DepartmentSpending({ variant, slug, year, division }: { variant:
             all={d.allTotal}
             allLabel="in this department's purchases"
             shares={d.shares}
+            subject={d.division ? d.division.name : d.dept.name}
+            noun="small purchases"
+            period={yearPhrase(year)}
             extras={[[d.vendors.length.toLocaleString(), "Vendors paid"], [fmtPct(top10, d.smallTotal), "To the top 10 vendors"]]}
           />
         </div>
@@ -777,7 +747,6 @@ export function CategoriesSpending({ variant, year, small = false }: { variant: 
   const total = cats.reduce((s, c) => s + c.total, 0);
   const max = Math.max(...cats.map((c) => c.total), 0);
   const path = small ? "/spending/by-category" : "/spending/categories";
-  const scope = small ? "small" : undefined;
   const shares = cats.reduce((s, c) => {
     for (const k of Object.keys(s) as (keyof Shares)[]) s[k] += c.shares[k];
     return s;
@@ -812,6 +781,9 @@ export function CategoriesSpending({ variant, year, small = false }: { variant: 
             all={all}
             allLabel={small ? "in all purchases, including bid contracts" : "in purchases"}
             shares={shares}
+            subject="Departments"
+            noun={small ? "small purchases" : "purchases, bid and unbid"}
+            period={yearPhrase(year)}
             extras={[[String(cats.length), "Categories"], [cats.filter((c) => c.hhi >= 2500).length.toString(), "Highly concentrated"]]}
           />
         </div>
@@ -821,39 +793,50 @@ export function CategoriesSpending({ variant, year, small = false }: { variant: 
             includes spending on bid and RFP contracts.
           </p>
         )}
-        <div className={`${t.card} mt-4 overflow-x-auto`}>
-          <table className="w-full min-w-[840px] text-sm">
-            <thead>
-              <tr className={`border-b ${t.border} text-left`}>
-                <th className={`px-4 py-2 ${t.th}`}>Category</th>
-                <th className={`px-4 py-2 ${t.th}`}>Spend</th>
-                <th className={`px-4 py-2 ${t.th}`}>Biggest vendor</th>
-                <th className={`px-4 py-2 text-right ${t.th}`}>Its share</th>
-                <th className={`px-4 py-2 text-right ${t.th}`}>Top 3</th>
-                <th className={`px-4 py-2 text-right ${t.th}`}>Large biz</th>
-                <th className={`px-4 py-2 ${t.th}`}>Concentration</th>
-              </tr>
-            </thead>
-            <tbody className={`divide-y ${t.divide}`}>
+        <div className="mt-6"><Filter t={t} target="cat-list" placeholder="Filter by category or vendor" noun="categories" /></div>
+        <div id="cat-list" className={`${t.card} mt-3 overflow-x-auto`}>
+          <div className="min-w-[900px] text-sm">
+            <div className={`grid ${CAT_COLS} gap-x-4 border-b ${t.border} px-4 py-2 ${t.th}`}>
+              <span>Category</span>
+              <span>Spend</span>
+              <span>Biggest vendor</span>
+              <span className="text-right">Its share</span>
+              <span className="text-right">Top 3</span>
+              <span className="text-right">Large biz</span>
+              <span>Concentration</span>
+            </div>
+            <div className={`divide-y ${t.divide}`}>
               {cats.map((c) => (
-                <tr key={c.account} className={t.rowHover}>
-                  <td className="px-4 py-3">
-                    <Link className={`font-medium ${t.plainLink}`} href={href(`/spending/categories/${c.account}`, { fy: year, scope })}>{c.label}</Link>
-                    <span className={`block text-xs ${t.muted}`}>{c.vendorCount.toLocaleString()} vendors</span>
-                  </td>
-                  <td className="w-44 px-4 py-3">
+                <CatRow
+                  key={c.account}
+                  t={t}
+                  account={c.account}
+                  label={c.label}
+                  year={year}
+                  small={small}
+                  filterText={[c.label, ...c.topNames].join(" | ")}
+                  summaryClass={`grid ${CAT_COLS} cursor-pointer list-none items-center gap-x-4 px-4 py-3 ${t.rowHover} [&::-webkit-details-marker]:hidden`}
+                >
+                  <span className="flex min-w-0 items-start gap-2">
+                    <span className={`mt-1 text-[10px] ${t.muted} transition group-open/cat:rotate-90`} aria-hidden="true">▶</span>
+                    <span className="min-w-0">
+                      <span className={`block truncate font-medium ${t.text}`}>{c.label}</span>
+                      <span className={`block text-xs ${t.muted}`}>{c.vendorCount.toLocaleString()} vendors</span>
+                    </span>
+                  </span>
+                  <span>
                     <span className={`block font-semibold tabular ${t.text}`}>{fmtMoney(c.total)}</span>
                     <span className="mt-1 block"><Bar t={t} value={c.total} max={max} /></span>
-                  </td>
-                  <td className={`max-w-[16rem] truncate px-4 py-3 ${t.text}`} title={c.top.name}>{c.top.name}</td>
-                  <td className={`px-4 py-3 text-right font-semibold tabular ${t.text}`}>{fmtPct(c.topShare, 1)}</td>
-                  <td className={`px-4 py-3 text-right tabular ${t.text}`}>{fmtPct(c.top3Share, 1)}</td>
-                  <td className={`px-4 py-3 text-right tabular ${t.text}`}>{fmtPct(c.shares.large, c.shares.total)}</td>
-                  <td className={`px-4 py-3 text-xs ${c.hhi >= 2500 ? "font-semibold" : ""} ${t.text}`}>{concentration(c.hhi)}</td>
-                </tr>
+                  </span>
+                  <span className={`truncate ${t.text}`} title={c.top.name}>{c.top.name}</span>
+                  <span className={`text-right font-semibold tabular ${t.text}`}>{fmtPct(c.topShare, 1)}</span>
+                  <span className={`text-right tabular ${t.text}`}>{fmtPct(c.top3Share, 1)}</span>
+                  <span className={`text-right tabular ${t.text}`}>{fmtPct(c.shares.large, c.shares.total)}</span>
+                  <span className={`text-xs ${c.hhi >= 2500 ? "font-semibold" : ""} ${t.text}`}>{concentration(c.hhi)}</span>
+                </CatRow>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </div>
         </div>
         <p className={`mt-3 text-xs ${t.muted}`}>
           Concentration uses the Herfindahl-Hirschman index of vendor shares, the measure antitrust agencies use: above 2,500

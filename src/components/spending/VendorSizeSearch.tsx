@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export type SizedVendor = [name: string, size: "large" | "small" | "nonprofit", federalName: string, stateTotal: number];
 
@@ -14,23 +14,29 @@ function money(n: number) {
 }
 
 // Every vendor with a size on federal record, searchable by name.
+// Mounted when its dialog first opens; the list loads then.
 export default function VendorSizeSearch({
-  vendors,
   classes,
 }: {
-  vendors: SizedVendor[];
   classes: { input: string; chip: string; chipOn: string; muted: string; text: string; divide: string; badge: Record<SizedVendor[1], string> };
 }) {
+  const [vendors, setVendors] = useState<SizedVendor[] | null>(null);
   const [q, setQ] = useState("");
+  useEffect(() => {
+    fetch("/api/spending/vendor-sizes")
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then(setVendors)
+      .catch(() => setVendors([]));
+  }, []);
   const [size, setSize] = useState<SizedVendor[1] | "all">("all");
   const counts = useMemo(() => {
     const c = { large: 0, small: 0, nonprofit: 0 };
-    for (const v of vendors) c[v[1]]++;
+    for (const v of vendors ?? []) c[v[1]]++;
     return c;
   }, [vendors]);
   const matches = useMemo(() => {
     const words = q.toUpperCase().split(/\s+/).filter(Boolean);
-    return vendors.filter(
+    return (vendors ?? []).filter(
       ([name, s, fed]) => (size === "all" || s === size) && words.every((w) => name.includes(w) || fed.toUpperCase().includes(w)),
     );
   }, [vendors, q, size]);
@@ -48,7 +54,7 @@ export default function VendorSizeSearch({
       <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
         {(["all", "large", "small", "nonprofit"] as const).map((s) => (
           <button key={s} type="button" onClick={() => setSize(s)} className={size === s ? classes.chipOn : classes.chip}>
-            {s === "all" ? `All ${vendors.length.toLocaleString()}` : `${LABEL[s]} ${counts[s].toLocaleString()}`}
+            {s === "all" ? `All ${(vendors?.length ?? 0).toLocaleString()}` : `${LABEL[s]} ${counts[s].toLocaleString()}`}
           </button>
         ))}
       </div>
@@ -67,7 +73,7 @@ export default function VendorSizeSearch({
         ))}
       </ul>
       <p className={`mt-3 text-xs ${classes.muted}`}>
-        {matches.length > SHOW ? `Showing ${SHOW} of ${matches.length.toLocaleString()}; search to narrow. ` : matches.length === 0 ? "No match. " : ""}
+        {!vendors ? "Loading… " : matches.length > SHOW ? `Showing ${SHOW} of ${matches.length.toLocaleString()}; search to narrow. ` : matches.length === 0 ? "No match. " : ""}
         Dollar figures are what the state paid each vendor for purchases, all years. A vendor not in this list has no
         federal size record and shows as size unknown.
       </p>

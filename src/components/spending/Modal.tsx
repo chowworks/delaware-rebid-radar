@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
 // A button that opens its children in a centered dialog. Closes on the close
-// button, Escape, or a click on the backdrop.
+// button, Escape, or a click on the backdrop. Children mount on first open.
 export default function Modal({
   label,
   title,
@@ -18,9 +18,13 @@ export default function Modal({
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const [opened, setOpened] = useState(false);
   return (
     <>
-      <button type="button" className={buttonClass} onClick={() => ref.current?.showModal()}>
+      <button type="button" className={buttonClass} onClick={() => {
+          setOpened(true);
+          ref.current?.showModal();
+        }}>
         {label}
       </button>
       <dialog
@@ -41,7 +45,7 @@ export default function Modal({
               ×
             </button>
           </div>
-          <div className="overflow-y-auto px-6 py-5">{children}</div>
+          <div className="overflow-y-auto px-6 py-5">{opened && children}</div>
         </div>
       </dialog>
     </>

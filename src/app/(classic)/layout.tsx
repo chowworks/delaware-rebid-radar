@@ -21,7 +21,7 @@ export default function ClassicLayout({ children }: Readonly<{ children: React.R
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-4 py-3 sm:px-6">
           <Link href="/" className="flex min-w-0 items-center gap-3">
             <Mark />
-            <span className="leading-tight">
+            <span className="hidden leading-tight sm:block">
               <span className="block text-[15px] font-semibold tracking-tight">Delaware Rebid Radar</span>
               <span className="hidden text-xs text-navy-100/70 sm:block">State contract opportunities for small &amp; diverse businesses</span>
             </span>
