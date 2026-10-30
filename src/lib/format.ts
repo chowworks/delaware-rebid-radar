@@ -51,3 +51,18 @@ export function windowCaption(status: WindowStatus, daysToPredicted: number): st
   if (daysToPredicted < 60) return `Most likely in ${daysToPredicted} days`;
   return `Most likely in ~${Math.round(daysToPredicted / 30.44)} months`;
 }
+
+export function fmtMoney(n: number): string {
+  const a = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  if (a >= 1e9) return `${sign}$${(a / 1e9).toFixed(2)}B`;
+  if (a >= 1e6) return `${sign}$${(a / 1e6).toFixed(a >= 1e8 ? 0 : 1)}M`;
+  if (a >= 1e4) return `${sign}$${Math.round(a / 1e3)}K`;
+  return `${sign}$${Math.round(a).toLocaleString("en-US")}`;
+}
+
+export function fmtPct(part: number, whole: number): string {
+  if (!whole) return "—";
+  const p = (part / whole) * 100;
+  return p > 0 && p < 1 ? "<1%" : `${Math.round(p)}%`;
+}

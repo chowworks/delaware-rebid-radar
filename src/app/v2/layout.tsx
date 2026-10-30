@@ -21,7 +21,7 @@ function Mark() {
 }
 
 const FOOTER = [
-  { head: "Platform", links: [["Opportunities", "/opportunities"], ["How it works", "/methodology"]] },
+  { head: "Platform", links: [["Opportunities", "/opportunities"], ["Where are you spending?", "/spending"], ["How it works", "/methodology"]] },
   {
     head: "Get ready",
     links: [["OSD certification", "https://osd.delaware.gov/"], ["Delaware Bids & Contracts", "https://mmp.delaware.gov/"]],
@@ -49,6 +49,7 @@ export default function V2Layout({ children }: Readonly<{ children: React.ReactN
             </Link>
             <nav className="hidden items-center gap-6 text-[14px] text-ink-800 md:flex">
               <Link href="/opportunities" className="hover:text-de-600">Opportunities</Link>
+              <Link href="/spending" className="hover:text-de-600">Where are you spending?</Link>
               <Link href="/methodology" className="hover:text-de-600">How it works</Link>
               <a href="https://osd.delaware.gov/" className="hover:text-de-600">Get certified</a>
             </nav>

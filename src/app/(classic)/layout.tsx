@@ -28,6 +28,7 @@ export default function ClassicLayout({ children }: Readonly<{ children: React.R
           </Link>
           <nav className="flex shrink-0 items-center gap-1 whitespace-nowrap text-sm">
             <Link href="/opportunities" className="rounded-md px-3 py-2 text-navy-100 hover:bg-white/10 hover:text-white">Opportunities</Link>
+            <Link href="/spending" className="rounded-md px-3 py-2 text-navy-100 hover:bg-white/10 hover:text-white"><span className="hidden sm:inline">Where are you spending?</span><span className="sm:hidden">Spending</span></Link>
             <Link href="/methodology" className="rounded-md px-3 py-2 text-navy-100 hover:bg-white/10 hover:text-white">How it works</Link>
           </nav>
         </div>
