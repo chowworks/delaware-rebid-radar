@@ -18,14 +18,18 @@ export async function GET(req: Request) {
   revalidatePath("/", "layout");
 
   // Warm both home pages so the next visitor gets fresh data without waiting.
-  const origin = new URL(req.url).origin;
-  const warmed = await Promise.all(
-    ["/", "/?design=2"].map((path) =>
-      fetch(`${origin}${path}`, { cache: "no-store", signal: AbortSignal.timeout(30_000) })
-        .then((res) => res.status)
-        .catch(() => null),
-    ),
-  );
+  // The host comes from Vercel's own env, never the request, so a forged Host
+  // header can't point these fetches elsewhere.
+  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  const warmed = host
+    ? await Promise.all(
+        ["/", "/?design=2"].map((path) =>
+          fetch(`https://${host}${path}`, { cache: "no-store", signal: AbortSignal.timeout(30_000) })
+            .then((res) => res.status)
+            .catch(() => null),
+        ),
+      )
+    : [];
 
   return Response.json({ revalidated: true, warmed, at: new Date().toISOString() });
 }
