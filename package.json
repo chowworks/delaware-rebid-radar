@@ -9,7 +9,9 @@
     "lint": "eslint",
     "check": "tsx scripts/check-predictions.ts",
     "check:live": "LIVE=1 tsx scripts/check-predictions.ts",
-    "calibrate": "tsx scripts/calibrate-lead-times.ts"
+    "calibrate": "tsx scripts/calibrate-lead-times.ts",
+    "build:spending": "tsx scripts/build-spending.ts",
+    "build:vendor-sizes": "tsx scripts/build-vendor-sizes.ts"
   },
   "dependencies": {
     "next": "^15.5.28",

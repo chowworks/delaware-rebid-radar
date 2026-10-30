@@ -21,13 +21,14 @@ export default function ClassicLayout({ children }: Readonly<{ children: React.R
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-6 px-4 py-3 sm:px-6">
           <Link href="/" className="flex min-w-0 items-center gap-3">
             <Mark />
-            <span className="leading-tight">
+            <span className="hidden leading-tight sm:block">
               <span className="block text-[15px] font-semibold tracking-tight">Delaware Rebid Radar</span>
               <span className="hidden text-xs text-navy-100/70 sm:block">State contract opportunities for small &amp; diverse businesses</span>
             </span>
           </Link>
           <nav className="flex shrink-0 items-center gap-1 whitespace-nowrap text-sm">
             <Link href="/opportunities" className="rounded-md px-3 py-2 text-navy-100 hover:bg-white/10 hover:text-white">Opportunities</Link>
+            <Link href="/spending" className="rounded-md px-3 py-2 text-navy-100 hover:bg-white/10 hover:text-white"><span className="hidden sm:inline">Where are you spending?</span><span className="sm:hidden">Spending</span></Link>
             <Link href="/methodology" className="rounded-md px-3 py-2 text-navy-100 hover:bg-white/10 hover:text-white">How it works</Link>
           </nav>
         </div>
