@@ -9,5 +9,5 @@ type SP = Promise<Record<string, string | string[] | undefined>>;
 export default async function Page({ params, searchParams }: { params: Promise<{ account: string }>; searchParams: SP }) {
   const [{ account }, q] = await Promise.all([params, searchParams]);
   const dept = typeof q.dept === "string" ? q.dept : undefined;
-  return <CategorySpending variant="v2" account={account} year={parseYear(q.fy)} dept={dept} />;
+  return <CategorySpending variant="v2" account={account} year={parseYear(q.fy)} dept={dept} small={q.scope === "small"} />;
 }

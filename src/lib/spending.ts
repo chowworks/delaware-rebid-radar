@@ -271,11 +271,15 @@ export function departmentDetail(slug: string, year: Year, divisionSlug?: string
 
 // All purchase spend (bid and unbid), per category, with how concentrated
 // each category is in its top vendor.
-export function categorySummaries(year: Year) {
+export function categorySummaries(year: Year, smallOnly = false) {
   const { payments } = model();
   const by = new Map<string, Map<number, number>>();
+  const shareLists = new Map<string, Payment[]>();
   for (const p of payments) {
-    if (!inYear(p, year) || p.amount <= 0) continue;
+    if (!inYear(p, year) || p.amount <= 0 || (smallOnly && !p.small)) continue;
+    const sl = shareLists.get(p.account) ?? [];
+    sl.push(p);
+    shareLists.set(p.account, sl);
     const m = by.get(p.account) ?? new Map<number, number>();
     m.set(p.vendor, (m.get(p.vendor) ?? 0) + p.amount);
     by.set(p.account, m);
@@ -297,16 +301,17 @@ export function categorySummaries(year: Year) {
         top3Share: list.slice(0, 3).reduce((s, v) => s + v, 0) / total,
         // Herfindahl index on a 0-10,000 scale; above 2,500 is "highly concentrated".
         hhi: Math.round(list.reduce((s, v) => s + (v / total) ** 2, 0) * 10_000),
+        shares: shares(shareLists.get(account) ?? [], vendors),
       };
     })
     .filter((c) => c.total > 0)
     .sort((a, b) => b.total - a.total);
 }
 
-export function categoryDetail(account: string, year: Year, deptSlug?: string) {
+export function categoryDetail(account: string, year: Year, deptSlug?: string, smallOnly = false) {
   if (!ACCOUNTS[account]) return null;
   const { payments, vendors, departments } = model();
-  const inCat = payments.filter((p) => p.account === account);
+  const inCat = payments.filter((p) => p.account === account && (!smallOnly || p.small));
   const dept = departments.find((d) => d.slug === deptSlug) ?? null;
   const scoped = inCat.filter((p) => inYear(p, year) && (!dept || p.dept === dept.index));
   const rows = vendorRows(scoped, vendors);
@@ -382,4 +387,17 @@ export function departmentTree(year: Year, vendorsPerDivision = 8) {
     );
   }
   return tree;
+}
+
+// Vendors with a size on federal record, largest state spend first, for the
+// searchable size list: [name, size, federal record name, state purchases].
+export function sizedVendors(): [string, "large" | "small" | "nonprofit", string, number][] {
+  const { vendors } = model();
+  const totals = new Map<number, number>();
+  for (const r of data.rows) totals.set(r[1], (totals.get(r[1]) ?? 0) + r[4]);
+  return vendors
+    .map((v, i) => ({ v, total: Math.round(totals.get(i) ?? 0) }))
+    .filter(({ v, total }) => v.size !== "unknown" && total > 0)
+    .sort((a, b) => b.total - a.total)
+    .map(({ v, total }) => [v.name, v.size as "large" | "small" | "nonprofit", v.sizeMatch ?? v.name, total]);
 }

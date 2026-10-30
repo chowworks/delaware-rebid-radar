@@ -8,6 +8,7 @@ import {
   departmentDetail,
   departmentSummaries,
   departmentTree,
+  sizedVendors,
   snapshotInfo,
   emptyShares,
   sizeSourceDate,
@@ -17,16 +18,21 @@ import {
   type Year,
 } from "@/lib/spending";
 import { THRESHOLDS, THRESHOLD_SOURCE, type Tier } from "@/lib/spending-rules";
+import Modal from "./Modal";
 import { THEMES, type Theme, type Variant } from "./theme";
+import VendorSizeSearch from "./VendorSizeSearch";
 
 // "Where are you spending?" pages, shared by both designs.
 //   /spending                      departments, small purchases (under the bid limits)
 //   /spending/[dept]               one department (?division=), its vendors
-//   /spending/categories           all purchase spend by category
+//   /spending/by-category          small purchases by category
+//   /spending/categories           all purchase spend by category (?scope=small on a category)
 //   /spending/categories/[account] one category, vendor concentration
 // Every page takes ?fy=2026 (default: all years).
 
 const OSD_DIRECTORY = "https://data.delaware.gov/d/8dxf-6ahp";
+const DIVERSE_TITLE =
+  "Certified by Delaware's Office of Supplier Diversity (OSD) as minority-, women-, veteran-, service-disabled veteran- or disability-owned";
 const OPEN_BIDS = "https://mmp.delaware.gov/";
 
 function href(path: string, q: Record<string, string | number | undefined | null>) {
@@ -104,7 +110,7 @@ function VendorBadges({ t, vendor: v }: { t: Theme; vendor: VendorInfo }) {
       {v.size === "large" && <Badge className={t.badgeLarge} title={title}>Large business</Badge>}
       {v.size === "small" && <Badge className={t.badgeSmall} title={title}>Small business</Badge>}
       {v.size === "nonprofit" && <Badge className={t.badgeNonprofit} title={title}>Nonprofit</Badge>}
-      {v.osd && <Badge className={t.badgeOsd}>OSD-certified</Badge>}
+      {v.osd && <Badge className={t.badgeOsd} title={DIVERSE_TITLE}>Diverse-owned</Badge>}
       {v.contracts.length > 0 && <Badge className={t.badgeContract}>On state contract</Badge>}
     </>
   );
@@ -150,64 +156,222 @@ function SizeSplit({ t, s }: { t: Theme; s: Shares }) {
             {SIZE_LABEL[p.key]} {fmtPct(p.value, s.total)}
           </span>
         ))}
-        <span>OSD-certified firms {fmtPct(s.osd, s.total)}</span>
+        <span title={DIVERSE_TITLE}>Certified diverse-owned firms {fmtPct(s.osd, s.total)}</span>
       </div>
     </div>
   );
 }
 
-// What "small purchases" means, in one line. The full limits and the method
-// open in a panel from the (i), on hover where hover exists and on tap or
-// keyboard everywhere (same pattern as DataSource).
+// What "small purchases" means, in one line, with the full limits, the method
+// and the vendor size list one click away in dialogs.
 function SmallPurchaseNote({ t }: { t: Theme }) {
   const tiers: Tier[] = ["goods", "prof", "works"];
+  const trigger = `inline-flex items-center gap-1.5 whitespace-nowrap font-medium underline underline-offset-2 ${t.text}`;
+  const icon = <span aria-hidden="true" className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-current text-[10px] font-semibold">i</span>;
   return (
-    <div className={`${t.note} flex flex-wrap items-start gap-x-2 gap-y-1 px-4 py-3 text-sm leading-relaxed`}>
-      <p className="min-w-0 flex-1">
+    <div className={`${t.note} px-4 py-3 text-sm leading-relaxed`}>
+      <p>
         <strong>Small purchases</strong> are buys under Delaware&apos;s open-market limits ({fmtMoney(THRESHOLDS.goods.openMarket)} goods
         and services, {fmtMoney(THRESHOLDS.prof.openMarket)} professional services, {fmtMoney(THRESHOLDS.works.openMarket)} public
         works) that need no public bid. Only those are shown here; larger purchases are bid publicly on{" "}
         <a className={t.link} href={OPEN_BIDS}>MMP</a>. Which payments count is our estimate.
       </p>
-      <details className="group relative [&::details-content]:[content-visibility:visible]">
-        <summary className="flex cursor-pointer list-none items-center gap-1 whitespace-nowrap font-medium underline underline-offset-2 [&::-webkit-details-marker]:hidden">
-          <span aria-hidden="true" className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-current text-[10px] font-semibold no-underline">i</span>
-          How this works
-        </summary>
-        <div className={`absolute right-0 top-full z-40 mt-2 hidden w-[min(34rem,calc(100vw-2rem))] rounded-xl border p-5 text-[13px] leading-relaxed shadow-xl group-open:block group-hover:block ${t.popover}`}>
-          <p className="font-semibold">Delaware&apos;s purchase limits</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            {tiers.map((k) => {
-              const th = THRESHOLDS[k];
-              return (
-                <div key={k}>
-                  <p className="text-xs font-semibold">{th.label}</p>
-                  <ul className={`mt-1 space-y-0.5 text-xs ${t.muted}`}>
-                    {th.steps.map(([range, rule]) => (
-                      <li key={range}>{range}: {rule}</li>
-                    ))}
-                  </ul>
-                  <p className={`mt-1 text-xs ${t.muted}`}>{th.basis}.</p>
-                </div>
-              );
-            })}
+      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+        <Modal label={<>{icon}How this works</>} title="How small purchases work" buttonClass={trigger} panelClass={t.popover}>
+          <div className={`space-y-6 text-sm leading-relaxed ${t.text}`}>
+            <section>
+              <h3 className={t.h3}>Delaware&apos;s purchase limits</h3>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full min-w-[30rem] text-left text-[13px]">
+                  <thead>
+                    <tr className={`border-b ${t.border}`}>
+                      <th className="py-2 pr-3 font-medium">Type of purchase</th>
+                      <th className="py-2 pr-3 font-medium">Open market, no bid</th>
+                      <th className="py-2 pr-3 font-medium">Quotes or letter bids</th>
+                      <th className="py-2 font-medium">Formal bid or RFP</th>
+                    </tr>
+                  </thead>
+                  <tbody className={`divide-y ${t.divide}`}>
+                    {tiers.map((k) => {
+                      const th = THRESHOLDS[k];
+                      return (
+                        <tr key={k}>
+                          <td className="py-2.5 pr-3 align-top">
+                            <span className="font-medium">{th.label}</span>
+                            <span className={`block text-xs ${t.muted}`}>{th.basis}</span>
+                          </td>
+                          {th.steps.map(([range, rule]) => (
+                            <td key={range} className="py-2.5 pr-3 align-top">
+                              <span className="font-semibold tabular">{range}</span>
+                              <span className={`block text-xs ${t.muted}`}>{rule}</span>
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <p className={`mt-2 text-xs ${t.muted}`}>
+                Source: Division of Accounting, <a className={t.link} href={THRESHOLD_SOURCE}>small purchase rules</a> (29 Del. C. ch. 69).
+              </p>
+            </section>
+            <section>
+              <h3 className={t.h3}>What this page shows</h3>
+              <p className="mt-2">
+                Only the first column: purchases small enough to skip a public bid. Anything bigger was bid or put out as an
+                RFP, and its record is public on <a className={t.link} href={OPEN_BIDS}>MMP</a>.
+              </p>
+            </section>
+            <section>
+              <h3 className={t.h3}>How we pick out small purchases</h3>
+              <p className="mt-2">
+                Payment records don&apos;t say which contract or purchase order a payment belongs to. So we add up what each
+                department paid each vendor in a fiscal year, per type of purchase, and count it only when that total stays
+                under the open-market limit and the vendor isn&apos;t on a current state contract. A run of small payments
+                that adds up past the limit is left out.
+              </p>
+            </section>
+            <section>
+              <h3 className={t.h3}>Worth knowing</h3>
+              <p className="mt-2">
+                For open-market purchases, agencies must ask at least one{" "}
+                <a className={t.link} href={OSD_DIRECTORY}>certified diverse vendor</a> for a quote.
+              </p>
+            </section>
           </div>
-          <p className="mt-4 font-semibold">How we pick out small purchases</p>
-          <p className="mt-1">
-            Payment records don&apos;t say which contract or purchase order a payment belongs to. So we add up what each
-            department paid each vendor in a fiscal year, per category, and count it only when that total stays under the
-            open-market limit and the vendor isn&apos;t on a current state contract. A run of small payments that adds up past
-            the limit is left out.
+        </Modal>
+      </div>
+    </div>
+  );
+}
+
+const INFO_ICON = (
+  <span aria-hidden="true" className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-current text-[10px] font-semibold">i</span>
+);
+
+function SizeInfo({ t }: { t: Theme }) {
+  const trigger = `inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium underline underline-offset-2 ${t.muted}`;
+  const icon = INFO_ICON;
+  return (
+    <Modal label={<>{icon}Who counts as a large or small business?</>} title="Large and small businesses" buttonClass={trigger} panelClass={t.popover}>
+          <p className={`text-sm leading-relaxed ${t.text}`}>
+            Delaware&apos;s data doesn&apos;t record company size, so we use federal records from{" "}
+            <a className={t.link} href="https://www.usaspending.gov/">USAspending.gov</a>: a firm&apos;s SAM.gov
+            registration and the federal contracts it has been paid on, measured against SBA size standards.
           </p>
-          <p className="mt-3">
-            For open-market purchases, agencies must ask at least one{" "}
-            <a className={t.link} href={OSD_DIRECTORY}>certified diverse vendor</a> for a quote.
-          </p>
-          <p className={`mt-3 text-xs ${t.muted}`}>
-            Source: Division of Accounting, <a className={t.link} href={THRESHOLD_SOURCE}>small purchase rules</a> (29 Del. C. ch. 69).
-          </p>
+          <ul className={`mt-3 space-y-1 text-sm ${t.text}`}>
+            <li><strong>Large business:</strong> on federal record as other than small.</li>
+            <li><strong>Small business:</strong> on record as small and paid on at least one federal award (a registration alone is self-reported, so it doesn&apos;t count).</li>
+            <li><strong>Nonprofit:</strong> registered as a nonprofit.</li>
+            <li><strong>Size unknown:</strong> no federal record, or the name didn&apos;t match. That is most local vendors.</li>
+          </ul>
+          <div className="mt-5">
+            <VendorSizeSearch
+              vendors={sizedVendors()}
+              classes={{
+                input: `${t.border} bg-white ${t.text}`,
+                chip: t.tab,
+                chipOn: t.tabOn,
+                muted: t.muted,
+                text: t.text,
+                divide: t.divide,
+                badge: { large: t.badgeLarge, small: t.badgeSmall, nonprofit: t.badgeNonprofit },
+              }}
+            />
+          </div>
+        </Modal>
+  );
+}
+
+function DiverseInfo({ t }: { t: Theme }) {
+  return (
+    <Modal
+      label={<>{INFO_ICON}<span className="sr-only">What is a certified diverse-owned firm?</span></>}
+      title="Certified diverse-owned firms"
+      buttonClass={`inline-flex items-center ${t.muted} hover:opacity-80`}
+      panelClass={t.popover}
+    >
+      <div className={`space-y-3 text-sm leading-relaxed ${t.text}`}>
+        <p>
+          Delaware&apos;s <strong>Office of Supplier Diversity (OSD)</strong> certifies businesses that are at least 51% owned
+          and run by people in these groups:
+        </p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>Minority-owned (MBE)</li>
+          <li>Women-owned (WBE)</li>
+          <li>Veteran-owned and service-disabled veteran-owned (VOBE, SDVOBE)</li>
+          <li>Owned by individuals with disabilities (IWDBE)</li>
+        </ul>
+        <p>
+          Certification is about who owns the firm, not its size: a few certified firms are large companies. For
+          open-market purchases, agencies must ask at least one certified diverse firm for a quote.
+        </p>
+        <p className={`text-xs ${t.muted}`}>
+          We match vendor names against the state&apos;s <a className={t.link} href={OSD_DIRECTORY}>certified firms list</a>{" "}
+          (about 800 firms), so a few will be missed. Learn about certification at{" "}
+          <a className={t.link} href="https://osd.delaware.gov/">osd.delaware.gov</a>.
+        </p>
+      </div>
+    </Modal>
+  );
+}
+
+// The headline numbers: how much, and who got it.
+function SpendSummary({ t, label, total, all, allLabel, shares, extras = [] }: { t: Theme; label: string; total: number; all: number; allLabel: string; shares: Shares; extras?: [string, string][] }) {
+  const parts = [
+    { key: "large", color: t.barLarge, value: shares.large },
+    { key: "small", color: t.bar, value: shares.small },
+    { key: "nonprofit", color: t.barNonprofit, value: shares.nonprofit },
+    { key: "unknown", color: t.barUnknown, value: shares.unknown },
+  ] as const;
+  return (
+    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+      <div className={`${t.card} flex flex-col p-5`}>
+        <p className={t.h3}>{label}</p>
+        <p className={`mt-2 ${t.stat} text-4xl`}>{fmtMoney(total)}</p>
+        <div className="mt-4">
+          <Bar t={t} value={total} max={all} />
+          <p className={`mt-1.5 text-xs ${t.muted}`}>{fmtPct(total, all)} of {fmtMoney(all)} {allLabel}</p>
         </div>
-      </details>
+        {extras.length > 0 && (
+          <dl className={`mt-auto grid grid-cols-2 gap-3 border-t ${t.border} pt-4`}>
+            {extras.map(([v, l]) => (
+              <div key={l}>
+                <dt className={`text-xs ${t.muted}`}>{l}</dt>
+                <dd className={`text-lg font-semibold tabular ${t.text}`}>{v}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+      </div>
+      <div className={`${t.card} p-5`}>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <p className={t.h3}>Who got it</p>
+          <SizeInfo t={t} />
+        </div>
+        <div className={`mt-4 flex h-4 w-full overflow-hidden rounded-md ${t.barTrack}`}>
+          {parts.map((p) => (
+            <div key={p.key} className={p.color} style={{ width: `${shares.total ? (p.value / shares.total) * 100 : 0}%` }} />
+          ))}
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {parts.map((p) => (
+            <div key={p.key}>
+              <p className={`flex items-center gap-1.5 text-xs ${t.muted}`}><span className={`h-2.5 w-2.5 rounded-sm ${p.color}`} />{SIZE_LABEL[p.key]}</p>
+              <p className={`mt-1 text-2xl font-semibold tabular ${t.text}`}>{fmtPct(p.value, shares.total)}</p>
+              <p className={`text-xs tabular ${t.muted}`}>{fmtMoney(p.value)}</p>
+            </div>
+          ))}
+        </div>
+        <div className={`mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-t ${t.border} pt-3 text-sm ${t.text}`}>
+          <span className="h-2.5 w-2.5 rounded-sm bg-emerald-600" />
+          <span>Certified diverse-owned firms</span>
+          <DiverseInfo t={t} />
+          <span className="ml-auto font-semibold tabular">{fmtPct(shares.osd, shares.total)}</span>
+          <span className={`text-xs tabular ${t.muted}`}>{fmtMoney(shares.osd)}</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -232,7 +396,9 @@ function DataNote({ t }: { t: Theme }) {
         other than small under SBA size standards; &ldquo;small business&rdquo; means it is recorded as small and has been
         paid on a federal award. Vendors with no federal record, or whose names didn&apos;t match, show as size unknown,
         and that is most local vendors.
-        &ldquo;On state contract&rdquo; and &ldquo;OSD-certified&rdquo; come from matching names against{" "}
+        &ldquo;Diverse-owned&rdquo; means certified by Delaware&apos;s Office of Supplier Diversity (OSD) as minority-,
+        women-, veteran-, service-disabled veteran- or disability-owned. &ldquo;On state contract&rdquo; and
+        &ldquo;diverse-owned&rdquo; come from matching names against{" "}
         <a className={t.link} href="https://data.delaware.gov/d/h9bb-iyu6">Awarded Vendor Contact Info</a> and the{" "}
         <a className={t.link} href={OSD_DIRECTORY}>OSD certified firms list</a>, so a few matches will be missed, and
         contracts that ended before today aren&apos;t in that list.
@@ -241,13 +407,14 @@ function DataNote({ t }: { t: Theme }) {
   );
 }
 
-function SpendTabs({ t, active, year }: { t: Theme; active: "small" | "all"; year: Year }) {
+function SpendTabs({ t, active, year }: { t: Theme; active: "dept" | "smallcat" | "all"; year: Year }) {
   const tabs = [
-    { key: "small", label: "Small purchases", to: href("/spending", { fy: year }) },
+    { key: "dept", label: "Small purchases by department", to: href("/spending", { fy: year }) },
+    { key: "smallcat", label: "Small purchases by category", to: href("/spending/by-category", { fy: year }) },
     { key: "all", label: "All spending by category", to: href("/spending/categories", { fy: year }) },
   ];
   return (
-    <nav className={`flex gap-6 border-b ${t.border} text-sm`}>
+    <nav className={`flex gap-x-6 gap-y-2 overflow-x-auto whitespace-nowrap border-b ${t.border} text-sm`}>
       {tabs.map((tab) => (
         <Link
           key={tab.key}
@@ -330,7 +497,7 @@ function VendorDetails({ t, row, max, scope, csv }: { t: Theme; row: VendorRow; 
             {row.vendor.contracts.map((c) => (
               <li key={c.url}><a className={t.link} href={c.url}>State contract: {c.title}</a></li>
             ))}
-            {row.vendor.osd && <li><a className={t.link} href={OSD_DIRECTORY}>OSD certified firms list</a></li>}
+            {row.vendor.osd && <li><a className={t.link} href={OSD_DIRECTORY}>Delaware certified diverse-owned firms list</a></li>}
             <li className={t.muted}>
               The state paid this vendor {fmtMoney(row.vendor.peakStateTotal)} in its biggest year, across all departments.
             </li>
@@ -405,18 +572,12 @@ export function SpendingHome({ variant, year }: { variant: Variant; year: Year }
         </p>
       </Hero>
       <div className={t.wrap}>
-        <SmallPurchaseNote t={t} />
+        <SpendTabs t={t} active="dept" year={year} />
+        <div className="mt-5"><SmallPurchaseNote t={t} /></div>
+        <div className="mt-5"><YearTabs t={t} year={year} path="/spending" /></div>
 
-        <div className="mt-8">
-          <SpendTabs t={t} active="small" year={year} />
-          <div className="mt-5"><YearTabs t={t} year={year} path="/spending" /></div>
-        </div>
-
-        <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Stat t={t} value={fmtMoney(total)} label="Small purchases" sub={`${yearLabel(year)}, all departments`} />
-          <Stat t={t} value={fmtPct(total, all)} label="Of all purchase spending" sub={`${fmtMoney(all)} including bid contracts`} />
-          <Stat t={t} value={fmtPct(shares.large, shares.total)} label="Went to large businesses" sub={`${fmtPct(shares.small, shares.total)} to small businesses`} />
-          <Stat t={t} value={fmtPct(shares.osd, shares.total)} label="Went to OSD-certified firms" />
+        <div className="mt-6">
+          <SpendSummary t={t} label={`Small purchases · ${yearLabel(year)}`} total={total} all={all} allLabel="in all purchases, including bid contracts" shares={shares} />
         </div>
 
         <section className="mt-10">
@@ -432,7 +593,7 @@ export function SpendingHome({ variant, year }: { variant: Variant; year: Year }
                 <span className="text-right">Vendors</span>
                 <span className="text-right">Large biz</span>
                 <span className="text-right">Small biz</span>
-                <span className="text-right">OSD</span>
+                <span className="text-right" title={DIVERSE_TITLE}>Diverse</span>
               </div>
               <div className={`divide-y ${t.divide}`}>
                 {depts.map((d) => (
@@ -527,12 +688,18 @@ export function DepartmentSpending({ variant, slug, year, division }: { variant:
       </Hero>
       <div className={t.wrap}>
         <YearTabs t={t} year={year} path={path} keep={{ division }} />
+        <div className="mt-5"><SmallPurchaseNote t={t} /></div>
 
-        <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Stat t={t} value={fmtMoney(d.smallTotal)} label="Small purchases" sub={`${fmtPct(d.smallTotal, d.allTotal)} of ${fmtMoney(d.allTotal)} total purchases`} />
-          <Stat t={t} value={d.vendors.length.toLocaleString()} label="Vendors paid" />
-          <Stat t={t} value={fmtPct(top10, d.smallTotal)} label="Went to the top 10 vendors" />
-          <Stat t={t} value={fmtPct(d.shares.large, d.shares.total)} label="Went to large businesses" sub={`${fmtPct(d.shares.small, d.shares.total)} to small businesses, ${fmtPct(d.shares.osd, d.shares.total)} to OSD-certified firms`} />
+        <div className="mt-6">
+          <SpendSummary
+            t={t}
+            label={`Small purchases · ${yearLabel(year)}`}
+            total={d.smallTotal}
+            all={d.allTotal}
+            allLabel="in this department's purchases"
+            shares={d.shares}
+            extras={[[d.vendors.length.toLocaleString(), "Vendors paid"], [fmtPct(top10, d.smallTotal), "To the top 10 vendors"]]}
+          />
         </div>
 
         <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
@@ -604,29 +771,58 @@ function concentration(hhi: number) {
   return "Spread out";
 }
 
-export function CategoriesSpending({ variant, year }: { variant: Variant; year: Year }) {
+export function CategoriesSpending({ variant, year, small = false }: { variant: Variant; year: Year; small?: boolean }) {
   const t = THEMES[variant];
-  const cats = categorySummaries(year);
+  const cats = categorySummaries(year, small);
   const total = cats.reduce((s, c) => s + c.total, 0);
   const max = Math.max(...cats.map((c) => c.total), 0);
+  const path = small ? "/spending/by-category" : "/spending/categories";
+  const scope = small ? "small" : undefined;
+  const shares = cats.reduce((s, c) => {
+    for (const k of Object.keys(s) as (keyof Shares)[]) s[k] += c.shares[k];
+    return s;
+  }, emptyShares());
+  const all = small ? categorySummaries(year).reduce((s, c) => s + c.total, 0) : total;
   return (
     <>
-      <Hero t={t} eyebrow="All purchase spending" title="Who soaks up the state's spending, and for what?">
-        <p>
-          Every purchase payment, bid contracts and small buys together, grouped by what it bought. For each category: how
-          much of it one company gets. A category where one vendor takes most of the money has little diversification.
-        </p>
-      </Hero>
+      {small ? (
+        <Hero t={t} eyebrow="Small purchases by category" title="What are small purchases buying, and from whom?">
+          <p>
+            Purchases small enough to skip a public bid, grouped by what they bought. For each category: who gets the money,
+            and how much goes to large businesses.
+          </p>
+        </Hero>
+      ) : (
+        <Hero t={t} eyebrow="All purchase spending" title="Who soaks up the state's spending, and for what?">
+          <p>
+            Every purchase payment, bid contracts and small buys together, grouped by what it bought. For each category: how
+            much of it one company gets. A category where one vendor takes most of the money has little diversification.
+          </p>
+        </Hero>
+      )}
       <div className={t.wrap}>
-        <SpendTabs t={t} active="all" year={year} />
-        <div className="mt-5"><YearTabs t={t} year={year} path="/spending/categories" /></div>
-        <p className={`mt-4 text-sm ${t.muted}`}>
-          {fmtMoney(total)} across {cats.length} categories, {yearPhrase(year)}. Unlike the{" "}
-          <Link className={t.link} href={href("/spending", { fy: year })}>small purchases view</Link>, this includes spending
-          on bid and RFP contracts.
-        </p>
+        <SpendTabs t={t} active={small ? "smallcat" : "all"} year={year} />
+        {small && <div className="mt-5"><SmallPurchaseNote t={t} /></div>}
+        <div className="mt-5"><YearTabs t={t} year={year} path={path} /></div>
+        <div className="mt-6">
+          <SpendSummary
+            t={t}
+            label={`${small ? "Small purchases" : "All purchases"} · ${yearLabel(year)}`}
+            total={total}
+            all={all}
+            allLabel={small ? "in all purchases, including bid contracts" : "in purchases"}
+            shares={shares}
+            extras={[[String(cats.length), "Categories"], [cats.filter((c) => c.hhi >= 2500).length.toString(), "Highly concentrated"]]}
+          />
+        </div>
+        {!small && (
+          <p className={`mt-4 text-sm ${t.muted}`}>
+            Unlike the <Link className={t.link} href={href("/spending", { fy: year })}>small purchases views</Link>, this
+            includes spending on bid and RFP contracts.
+          </p>
+        )}
         <div className={`${t.card} mt-4 overflow-x-auto`}>
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[840px] text-sm">
             <thead>
               <tr className={`border-b ${t.border} text-left`}>
                 <th className={`px-4 py-2 ${t.th}`}>Category</th>
@@ -634,6 +830,7 @@ export function CategoriesSpending({ variant, year }: { variant: Variant; year: 
                 <th className={`px-4 py-2 ${t.th}`}>Biggest vendor</th>
                 <th className={`px-4 py-2 text-right ${t.th}`}>Its share</th>
                 <th className={`px-4 py-2 text-right ${t.th}`}>Top 3</th>
+                <th className={`px-4 py-2 text-right ${t.th}`}>Large biz</th>
                 <th className={`px-4 py-2 ${t.th}`}>Concentration</th>
               </tr>
             </thead>
@@ -641,7 +838,7 @@ export function CategoriesSpending({ variant, year }: { variant: Variant; year: 
               {cats.map((c) => (
                 <tr key={c.account} className={t.rowHover}>
                   <td className="px-4 py-3">
-                    <Link className={`font-medium ${t.plainLink}`} href={href(`/spending/categories/${c.account}`, { fy: year })}>{c.label}</Link>
+                    <Link className={`font-medium ${t.plainLink}`} href={href(`/spending/categories/${c.account}`, { fy: year, scope })}>{c.label}</Link>
                     <span className={`block text-xs ${t.muted}`}>{c.vendorCount.toLocaleString()} vendors</span>
                   </td>
                   <td className="w-44 px-4 py-3">
@@ -651,6 +848,7 @@ export function CategoriesSpending({ variant, year }: { variant: Variant; year: 
                   <td className={`max-w-[16rem] truncate px-4 py-3 ${t.text}`} title={c.top.name}>{c.top.name}</td>
                   <td className={`px-4 py-3 text-right font-semibold tabular ${t.text}`}>{fmtPct(c.topShare, 1)}</td>
                   <td className={`px-4 py-3 text-right tabular ${t.text}`}>{fmtPct(c.top3Share, 1)}</td>
+                  <td className={`px-4 py-3 text-right tabular ${t.text}`}>{fmtPct(c.shares.large, c.shares.total)}</td>
                   <td className={`px-4 py-3 text-xs ${c.hhi >= 2500 ? "font-semibold" : ""} ${t.text}`}>{concentration(c.hhi)}</td>
                 </tr>
               ))}
@@ -668,9 +866,10 @@ export function CategoriesSpending({ variant, year }: { variant: Variant; year: 
   );
 }
 
-export function CategorySpending({ variant, account, year, dept }: { variant: Variant; account: string; year: Year; dept?: string }) {
+export function CategorySpending({ variant, account, year, dept, small = false }: { variant: Variant; account: string; year: Year; dept?: string; small?: boolean }) {
   const t = THEMES[variant];
-  const c = categoryDetail(account, year, dept);
+  const c = categoryDetail(account, year, dept, small);
+  const scope = small ? "small" : undefined;
   if (!c) notFound();
   const path = `/spending/categories/${account}`;
   const top = c.vendors[0];
@@ -684,16 +883,20 @@ export function CategorySpending({ variant, account, year, dept }: { variant: Va
         t={t}
         eyebrow={`Category · ${THRESHOLDS[c.tier].label}`}
         title={c.label}
-        crumbs={[["All spending by category", href("/spending/categories", { fy: year })]]}
+        crumbs={[small ? ["Small purchases by category", href("/spending/by-category", { fy: year })] : ["All spending by category", href("/spending/categories", { fy: year })]]}
       >
         <p>
           {c.dept ? `${c.dept.name}, ` : "All departments, "}
-          {yearPhrase(year)}. Includes bid contracts and small purchases;{" "}
-          {fmtMoney(c.smallTotal)} ({fmtPct(c.smallTotal, c.total)}) was small purchases.
+          {yearPhrase(year)}.{" "}
+          {small ? (
+            <>Small purchases only. <Link className={t.link} href={href(path, { fy: year, dept })}>Include bid contracts</Link></>
+          ) : (
+            <>Includes bid contracts and small purchases; {fmtMoney(c.smallTotal)} ({fmtPct(c.smallTotal, c.total)}) was small purchases. <Link className={t.link} href={href(path, { fy: year, dept, scope: "small" })}>Small purchases only</Link></>
+          )}
         </p>
       </Hero>
       <div className={t.wrap}>
-        <YearTabs t={t} year={year} path={path} keep={{ dept }} />
+        <YearTabs t={t} year={year} path={path} keep={{ dept, scope }} />
         <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Stat t={t} value={fmtMoney(c.total)} label="Spent in this category" />
           <Stat t={t} value={c.vendors.length.toLocaleString()} label="Vendors paid" />
@@ -721,11 +924,11 @@ export function CategorySpending({ variant, account, year, dept }: { variant: Va
               <h2 className={t.h3}>Departments</h2>
               <ul className="mt-3 space-y-2.5 text-sm">
                 <li>
-                  <Link href={href(path, { fy: year })} className={!c.dept ? `font-semibold ${t.text}` : t.link}>All departments</Link>
+                  <Link href={href(path, { fy: year, scope })} className={!c.dept ? `font-semibold ${t.text}` : t.link}>All departments</Link>
                 </li>
                 {c.departments.map((x) => (
                   <li key={x.slug}>
-                    <Link href={href(path, { fy: year, dept: x.slug })} className={c.dept?.slug === x.slug ? `font-semibold ${t.text}` : t.link}>
+                    <Link href={href(path, { fy: year, dept: x.slug, scope })} className={c.dept?.slug === x.slug ? `font-semibold ${t.text}` : t.link}>
                       {x.name}
                     </Link>
                     <span className="mt-1 grid grid-cols-[1fr_4.5rem] items-center gap-2">
