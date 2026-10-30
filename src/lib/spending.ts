@@ -1,5 +1,6 @@
 import "server-only";
 import raw from "@/data/spending.json";
+import sizes from "@/data/vendor-sizes.json";
 import { ACCOUNTS, THRESHOLDS, slugify, type Tier } from "./spending-rules";
 
 // Reads the Checkbook snapshot built by scripts/build-spending.ts and answers
@@ -27,12 +28,9 @@ interface Snapshot {
 const data = raw as unknown as Snapshot;
 
 export const INDIVIDUALS = "Individual payees (names withheld)";
-// A vendor paid at least this much by the whole state in some fiscal year is
-// treated as a large supplier. Size is not in the open data; this is a proxy.
-export const LARGE_SUPPLIER = 5_000_000;
 
 export type Year = number | "all";
-export type VendorSize = "large" | "small";
+export type VendorSize = "large" | "small" | "nonprofit" | "unknown";
 
 export interface Payment {
   dept: number;
@@ -52,7 +50,19 @@ export interface VendorInfo {
   osd: boolean;
   contracts: { title: string; url: string }[];
   size: VendorSize;
+  sizeMatch: string | null;
   peakStateTotal: number;
+}
+
+// Company size from federal award records (scripts/build-vendor-sizes.ts):
+// "large" is a firm federal contracting officers recorded as other than small
+// under the SBA size standards. Government payees count as unknown.
+const sizeRecords = (sizes as unknown as { vendors: Record<string, { size: string; match?: string }> }).vendors;
+export const sizeSourceDate = (sizes as unknown as { builtAt: string }).builtAt;
+
+function vendorSize(name: string): VendorSize {
+  const s = sizeRecords[name]?.size;
+  return s === "large" || s === "small" || s === "nonprofit" ? s : "unknown";
 }
 
 let built: ReturnType<typeof build> | null = null;
@@ -82,7 +92,8 @@ function build() {
       slug: `${slugify(name)}-${i}`,
       osd: !!osd,
       contracts: refs.map((r) => ({ title: data.contracts[r][0], url: data.contracts[r][1] })),
-      size: peakStateTotal >= LARGE_SUPPLIER ? "large" : "small",
+      size: vendorSize(name),
+      sizeMatch: sizeRecords[name]?.match ?? null,
       peakStateTotal,
     };
   });
@@ -140,11 +151,15 @@ export interface Shares {
   total: number;
   large: number;
   small: number;
+  nonprofit: number;
+  unknown: number;
   osd: number;
 }
 
+export const emptyShares = (): Shares => ({ total: 0, large: 0, small: 0, nonprofit: 0, unknown: 0, osd: 0 });
+
 function shares(list: Payment[], vendors: VendorInfo[]): Shares {
-  const by: Shares = { total: 0, large: 0, small: 0, osd: 0 };
+  const by = emptyShares();
   for (const p of list) {
     by.total += p.amount;
     by[vendors[p.vendor].size] += p.amount;
@@ -333,4 +348,38 @@ export function checkbookCsv(opts: { department?: string; vendor?: string; accou
     $limit: "10000",
   });
   return `https://data.delaware.gov/resource/7bip-nb4g.csv?${params}`;
+}
+
+// Departments > divisions > top vendors, for browsing small purchases in place.
+export function departmentTree(year: Year, vendorsPerDivision = 8) {
+  const { payments, vendors } = model();
+  const byDept = new Map<number, Map<number, Map<number, number>>>();
+  for (const p of payments) {
+    if (!p.small || !inYear(p, year)) continue;
+    const divs = byDept.get(p.dept) ?? new Map<number, Map<number, number>>();
+    const vs = divs.get(p.div) ?? new Map<number, number>();
+    vs.set(p.vendor, (vs.get(p.vendor) ?? 0) + p.amount);
+    divs.set(p.div, vs);
+    byDept.set(p.dept, divs);
+  }
+  const tree = new Map<number, { name: string; slug: string; total: number; vendorCount: number; vendors: { vendor: VendorInfo; total: number }[] }[]>();
+  for (const [dept, divs] of byDept) {
+    tree.set(
+      dept,
+      [...divs]
+        .map(([div, vs]) => {
+          const list = [...vs].filter(([, t]) => t > 0).sort((a, b) => b[1] - a[1]);
+          return {
+            name: divisionName(div),
+            slug: slugify(divisionName(div)),
+            total: list.reduce((s, [, t]) => s + t, 0),
+            vendorCount: list.length,
+            vendors: list.slice(0, vendorsPerDivision).map(([v, total]) => ({ vendor: vendors[v], total })),
+          };
+        })
+        .filter((d) => d.total > 0)
+        .sort((a, b) => b.total - a.total),
+    );
+  }
+  return tree;
 }

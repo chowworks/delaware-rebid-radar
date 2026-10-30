@@ -55,7 +55,7 @@ export default function V2Layout({ children }: Readonly<{ children: React.ReactN
             </nav>
           </div>
           <div className="flex shrink-0 items-center gap-4 text-[14px]">
-            <Link href="/methodology" className="text-ink-800 hover:text-de-600 md:hidden">How it works</Link>
+            <Link href="/spending" className="text-ink-800 hover:text-de-600 md:hidden">Spending</Link>
             <Link href="/opportunities" className="rounded-md bg-de-600 px-4 py-2.5 text-[13px] font-medium text-white hover:bg-de-700">
               Search contracts
             </Link>
