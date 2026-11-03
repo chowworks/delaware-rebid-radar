@@ -1,8 +1,21 @@
 import type { Metadata } from "next";
 import { VendorSpending } from "@/components/spending/Spending";
-import { parseYear } from "@/lib/spending";
+import { parseYear, vendorName } from "@/lib/spending";
+import { alt, size } from "@/app/opengraph-image";
 
-export const metadata: Metadata = { title: "Where are you spending?" };
+export async function generateMetadata({ params }: { params: Promise<{ vendor: string }> }): Promise<Metadata> {
+  const name = vendorName((await params).vendor);
+  if (!name) return { title: "Where are you spending?" };
+  const description = `What Delaware state departments paid ${name}, and how much of it was small purchases made without a bid.`;
+  // Setting openGraph/twitter replaces the inherited objects, so name the site preview image again.
+  const images = [{ url: "/opengraph-image", alt, ...size }];
+  return {
+    title: name,
+    description,
+    openGraph: { title: name, description, images },
+    twitter: { card: "summary_large_image", title: name, description, images },
+  };
+}
 
 type SP = Promise<Record<string, string | string[] | undefined>>;
 

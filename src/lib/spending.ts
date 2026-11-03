@@ -477,6 +477,12 @@ export function searchVendors(q: string, limit = 8) {
   };
 }
 
+// Just the display name for a vendor slug (page titles and link previews).
+export function vendorName(slug: string): string | null {
+  const v = model().vendors.find((x) => x.slug === slug);
+  return v && v.name !== INDIVIDUALS ? v.name : null;
+}
+
 // One vendor across every department: what it was paid, for what, and how
 // much of it counts as small purchases.
 export function vendorDetail(slug: string, year: Year) {
