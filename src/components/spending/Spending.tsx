@@ -14,6 +14,7 @@ import {
   type VendorInfo,
   type VendorRow,
   type Year,
+  vendorDetail,
 } from "@/lib/spending";
 import { THRESHOLDS, THRESHOLD_SOURCE, type Tier } from "@/lib/spending-rules";
 import CatRow from "./CatRow";
@@ -21,6 +22,7 @@ import DeptRow from "./DeptRow";
 import Modal from "./Modal";
 import QuickFilter from "./QuickFilter";
 import { THEMES, type Theme, type Variant } from "./theme";
+import VendorSearch from "./VendorSearch";
 import VendorSizeSearch from "./VendorSizeSearch";
 
 // "Where are you spending?" pages, shared by both designs.
@@ -29,6 +31,7 @@ import VendorSizeSearch from "./VendorSizeSearch";
 //   /spending/by-category          small purchases by category
 //   /spending/categories           all purchase spend by category (?scope=small on a category)
 //   /spending/categories/[account] one category, vendor concentration
+//   /spending/vendors/[vendor]     one vendor across every department
 // Every page takes ?fy=2026 (default: all years).
 
 const OSD_DIRECTORY = "https://data.delaware.gov/d/8dxf-6ahp";
@@ -427,6 +430,14 @@ function SpendTabs({ t, active, year }: { t: Theme; active: "dept" | "smallcat" 
   );
 }
 
+function FindVendor({ t }: { t: Theme }) {
+  return (
+    <VendorSearch
+      classes={{ input: `${t.border} bg-white ${t.text}`, panel: t.popover, muted: t.muted, text: t.text, divide: t.divide, row: t.rowHover }}
+    />
+  );
+}
+
 // One vendor, opened for detail. `scope` says what the per-place list holds.
 function VendorDetails({ t, row, max, scope, csv }: { t: Theme; row: VendorRow; max: number; scope: "divisions" | "departments"; csv: string }) {
   const { fiscalYears } = snapshotInfo();
@@ -491,7 +502,10 @@ function VendorDetails({ t, row, max, scope, csv }: { t: Theme; row: VendorRow; 
             {row.vendor.name.startsWith("Individual") ? (
               <li className={t.muted}>Names of individual payees are not shown here.</li>
             ) : (
-              <li><a className={t.link} href={csv}>Every payment, from the state (CSV)</a></li>
+              <>
+                <li><Link className={t.link} href={`/spending/vendors/${row.vendor.slug}`}>This vendor across every department</Link></li>
+                <li><a className={t.link} href={csv}>Every payment, from the state (CSV)</a></li>
+              </>
             )}
             {row.vendor.contracts.map((c) => (
               <li key={c.url}><a className={t.link} href={c.url}>State contract: {c.title}</a></li>
@@ -571,6 +585,7 @@ export function SpendingHome({ variant, year }: { variant: Variant; year: Year }
       </Hero>
       <div className={t.wrap}>
         <SpendTabs t={t} active="dept" year={year} />
+        <div className="mt-4"><FindVendor t={t} /></div>
         <div className="mt-5"><SmallPurchaseNote t={t} /></div>
         <div className="mt-5"><YearTabs t={t} year={year} path="/spending" /></div>
 
@@ -771,6 +786,7 @@ export function CategoriesSpending({ variant, year, small = false }: { variant: 
       )}
       <div className={t.wrap}>
         <SpendTabs t={t} active={small ? "smallcat" : "all"} year={year} />
+        <div className="mt-4"><FindVendor t={t} /></div>
         {small && <div className="mt-5"><SmallPurchaseNote t={t} /></div>}
         <div className="mt-5"><YearTabs t={t} year={year} path={path} /></div>
         <div className="mt-6">
@@ -922,6 +938,121 @@ export function CategorySpending({ variant, account, year, dept, small = false }
                 ))}
               </ul>
             </section>
+          </aside>
+        </div>
+        <DataNote t={t} />
+      </div>
+    </>
+  );
+}
+
+export function VendorSpending({ variant, slug, year }: { variant: Variant; slug: string; year: Year }) {
+  const t = THEMES[variant];
+  const v = vendorDetail(slug, year);
+  if (!v) notFound();
+  const path = `/spending/vendors/${slug}`;
+  const onContract = v.vendor.contracts.length > 0;
+  const bid = v.total - v.smallTotal;
+  const deptMax = Math.max(...v.departments.map((d) => d.all), 0);
+  const catMax = Math.max(...v.categories.map((c) => c.all), 0);
+
+  return (
+    <>
+      <Hero t={t} eyebrow="Vendor" title={v.vendor.name} crumbs={[["Where are you spending?", href("/spending", { fy: year })]]}>
+        <p>What every department paid this vendor for purchases, {yearPhrase(year)}, and how much of it was small purchases.</p>
+        <div className="mt-3 flex flex-wrap gap-1.5"><VendorBadges t={t} vendor={v.vendor} /></div>
+      </Hero>
+      <div className={t.wrap}>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <YearTabs t={t} year={year} path={path} />
+          <FindVendor t={t} />
+        </div>
+
+        <div className="mt-6 grid gap-4 sm:grid-cols-3">
+          <Stat t={t} value={fmtMoney(v.total)} label="Paid for purchases" sub={`${v.payments.toLocaleString()} payments from ${v.departments.length} department${v.departments.length === 1 ? "" : "s"}`} />
+          <Stat t={t} value={fmtMoney(v.smallTotal)} label="Small purchases" sub={`${fmtPct(v.smallTotal, v.total)} of the total`} />
+          <Stat t={t} value={fmtMoney(bid)} label={onContract ? "On contract or over the limits" : "Over the bid limits"} sub={`${fmtPct(bid, v.total)} of the total`} />
+        </div>
+
+        <p className={`${t.note} mt-4 px-4 py-3 text-sm`}>
+          {onContract ? (
+            <>
+              This vendor holds a state contract, so none of its payments count as small purchases. The Checkbook doesn&apos;t
+              record which payments were made under a contract, so this rule may also exclude some real small purchases.
+            </>
+          ) : (
+            <>
+              A department&apos;s payments to this vendor count as small purchases when its yearly total for a type of purchase
+              stays under the open-market limit ($50K for goods, $100K for professional services, $150K for public works).
+            </>
+          )}{" "}
+          Grants, salaries and other non-purchase payments aren&apos;t included.
+        </p>
+
+        <div className="mt-10 grid gap-10 lg:grid-cols-2">
+          <section>
+            <h2 className={t.h2}>Which departments</h2>
+            <div className={`${t.card} mt-4 overflow-hidden`}>
+              <div className={`grid grid-cols-[minmax(0,1fr)_7rem_6rem] gap-x-4 border-b ${t.border} px-4 py-2 ${t.th}`}>
+                <span>Department</span>
+                <span>Paid</span>
+                <span className="text-right">Small</span>
+              </div>
+              <ul className={`divide-y ${t.divide}`}>
+                {v.departments.map((d) => (
+                  <li key={d.slug} className="grid grid-cols-[minmax(0,1fr)_7rem_6rem] items-center gap-x-4 px-4 py-3 text-sm">
+                    <Link className={`truncate ${t.link}`} href={href(`/spending/${d.slug}`, { fy: year })}>{d.name}</Link>
+                    <span>
+                      <span className={`block font-semibold tabular ${t.text}`}>{fmtMoney(d.all)}</span>
+                      <span className="mt-1 block"><Bar t={t} value={d.all} max={deptMax} /></span>
+                    </span>
+                    <span className={`text-right tabular ${t.muted}`}>{d.small ? fmtMoney(d.small) : "—"}</span>
+                  </li>
+                ))}
+                {v.departments.length === 0 && <li className={`px-4 py-6 text-sm ${t.muted}`}>No purchases {yearPhrase(year)}.</li>}
+              </ul>
+            </div>
+          </section>
+
+          <section>
+            <h2 className={t.h2}>What for</h2>
+            <div className={`${t.card} mt-4 overflow-hidden`}>
+              <div className={`grid grid-cols-[minmax(0,1fr)_7rem_6rem] gap-x-4 border-b ${t.border} px-4 py-2 ${t.th}`}>
+                <span>Category</span>
+                <span>Paid</span>
+                <span className="text-right">Small</span>
+              </div>
+              <ul className={`divide-y ${t.divide}`}>
+                {v.categories.map((c) => (
+                  <li key={c.account} className="grid grid-cols-[minmax(0,1fr)_7rem_6rem] items-center gap-x-4 px-4 py-3 text-sm">
+                    <Link className={`truncate ${t.link}`} href={href(`/spending/categories/${c.account}`, { fy: year })}>{c.label}</Link>
+                    <span>
+                      <span className={`block font-semibold tabular ${t.text}`}>{fmtMoney(c.all)}</span>
+                      <span className="mt-1 block"><Bar t={t} value={c.all} max={catMax} /></span>
+                    </span>
+                    <span className={`text-right tabular ${t.muted}`}>{c.small ? fmtMoney(c.small) : "—"}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        </div>
+
+        <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <section>
+            <h2 className={t.h2}>By fiscal year</h2>
+            <p className={`mt-1 text-sm ${t.muted}`}>All purchases from this vendor, every year.</p>
+            <div className={`${t.card} mt-4 p-4`}><ByYear t={t} rows={v.byYear} field="all" /></div>
+          </section>
+          <aside>
+            <h2 className={t.h3}>Where to learn more</h2>
+            <ul className="mt-3 space-y-2 text-sm">
+              <li><a className={t.link} href={checkbookCsv({ vendor: v.vendor.name, year })}>Every payment, from the state (CSV)</a></li>
+              {v.vendor.contracts.map((c) => (
+                <li key={c.url}><a className={t.link} href={c.url}>State contract: {c.title}</a></li>
+              ))}
+              {v.vendor.osd && <li><a className={t.link} href={OSD_DIRECTORY}>Delaware certified diverse-owned firms list</a></li>}
+            </ul>
           </aside>
         </div>
         <DataNote t={t} />

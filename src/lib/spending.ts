@@ -441,3 +441,86 @@ export function sizedVendors(): [string, "large" | "small" | "nonprofit", string
     .sort((a, b) => b.total - a.total)
     .map(({ v, total }) => [v.name, v.size as "large" | "small" | "nonprofit", v.sizeMatch ?? v.name, total]);
 }
+
+// Named vendors whose name holds every word of `q`, largest purchase spend
+// first, for the vendor search box: [name, slug, total, small-purchase total,
+// on a state contract (0/1)].
+let vendorTotals: [number, number, number][] | null = null; // [vendor, total, small], largest first
+
+export function searchVendors(q: string, limit = 8) {
+  const { payments, vendors } = model();
+  if (!vendorTotals) {
+    const totals = new Map<number, [number, number]>();
+    for (const p of payments) {
+      const t = totals.get(p.vendor) ?? [0, 0];
+      t[0] += p.amount;
+      if (p.small) t[1] += p.amount;
+      totals.set(p.vendor, t);
+    }
+    vendorTotals = [...totals]
+      .filter(([v, [total]]) => total > 0 && vendors[v].name !== INDIVIDUALS)
+      .map(([v, [total, small]]) => [v, total, small] as [number, number, number])
+      .sort((a, b) => b[1] - a[1]);
+  }
+  const words = q.toUpperCase().split(/[^A-Z0-9&]+/).filter(Boolean);
+  if (!words.length) return { count: 0, vendors: [] };
+  const hits = vendorTotals.filter(([v]) => words.every((w) => vendors[v].name.toUpperCase().includes(w)));
+  return {
+    count: hits.length,
+    vendors: hits.slice(0, limit).map(([v, total, small]) => [
+      vendors[v].name,
+      vendors[v].slug,
+      Math.round(total),
+      Math.round(small),
+      vendors[v].contracts.length ? 1 : 0,
+    ] as [string, string, number, number, 0 | 1]),
+  };
+}
+
+// One vendor across every department: what it was paid, for what, and how
+// much of it counts as small purchases.
+export function vendorDetail(slug: string, year: Year) {
+  const { payments, vendors, departments } = model();
+  const id = vendors.findIndex((v) => v.slug === slug);
+  if (id < 0 || vendors[id].name === INDIVIDUALS) return null;
+  const vendor = vendors[id];
+  const mine = payments.filter((p) => p.vendor === id);
+  const scoped = mine.filter((p) => inYear(p, year));
+
+  const sum = (list: Payment[]) => list.reduce((s, p) => s + p.amount, 0);
+  const total = sum(scoped);
+  const smallTotal = sum(scoped.filter((p) => p.small));
+
+  const deptMap = new Map<number, { all: number; small: number; payments: number }>();
+  const catMap = new Map<string, { all: number; small: number }>();
+  for (const p of scoped) {
+    const d = deptMap.get(p.dept) ?? { all: 0, small: 0, payments: 0 };
+    d.all += p.amount;
+    d.payments += p.payments;
+    if (p.small) d.small += p.amount;
+    deptMap.set(p.dept, d);
+    const c = catMap.get(p.account) ?? { all: 0, small: 0 };
+    c.all += p.amount;
+    if (p.small) c.small += p.amount;
+    catMap.set(p.account, c);
+  }
+  return {
+    vendor,
+    total,
+    smallTotal,
+    payments: scoped.reduce((s, p) => s + p.payments, 0),
+    departments: [...deptMap]
+      .filter(([, d]) => d.all > 0)
+      .sort((a, b) => b[1].all - a[1].all)
+      .map(([d, v]) => ({ name: departments[d].name, slug: departments[d].slug, ...v })),
+    categories: [...catMap]
+      .filter(([, c]) => c.all > 0)
+      .sort((a, b) => b[1].all - a[1].all)
+      .map(([account, v]) => ({ account, label: accountLabel(account), ...v })),
+    byYear: data.fiscalYears.map((fy) => ({
+      fy,
+      all: sum(mine.filter((p) => p.fy === fy)),
+      small: sum(mine.filter((p) => p.fy === fy && p.small)),
+    })),
+  };
+}
