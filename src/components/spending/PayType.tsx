@@ -1,0 +1,20 @@
+import type { Theme } from "./theme";
+
+// How the state paid a vendor: with a state purchase card (P-card), or by
+// check or ACH against an invoice (a purchase order or contract). Every vendor
+// row comes from one of the two sources, so every row gets one chip.
+export const PCARD_TITLE =
+  "Paid with a state purchase card (P-card). Card buys skip the purchase order and the vendor invoice, so they only show up in the state's card transaction data.";
+export const INVOICE_TITLE =
+  "Paid by check or ACH against a vendor invoice, under a purchase order or contract.";
+
+export function PayType({ t, pcard }: { t: Theme; pcard: boolean }) {
+  return (
+    <span
+      title={pcard ? PCARD_TITLE : INVOICE_TITLE}
+      className={`inline-flex items-center whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${pcard ? t.badgePcard : t.badgeInvoice}`}
+    >
+      {pcard ? "P-card" : "Invoice"}
+    </span>
+  );
+}
