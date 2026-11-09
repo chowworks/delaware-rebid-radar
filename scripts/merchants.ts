@@ -53,10 +53,10 @@ export function cleanMerchant(raw: string): string {
     m = PROCESSORS.has(head) && rest ? rest.split("*")[0].trim() || rest : head || rest;
   }
   for (const [re, name] of BRANDS) if (re.test(m)) return name;
-  m = m
-    .replace(/\s*#.*$/, "") // store numbers
-    .replace(/(\s+\S*\d\S*)+$/, "") // trailing tokens with digits
-    .replace(/[\s.,\-/*]+$/, "")
-    .trim();
+  const hash = m.indexOf("#"); // store numbers
+  const words = (hash >= 0 ? m.slice(0, hash) : m).split(" ").filter(Boolean);
+  // Drop trailing tokens with digits (store or order numbers), keeping the first word.
+  while (words.length > 1 && /\d/.test(words[words.length - 1])) words.pop();
+  m = words.join(" ").replace(/[\s.,\-/*]+$/, "").trim();
   return m || raw.toUpperCase().trim();
 }

@@ -54,7 +54,9 @@ function winner<K>(m: Map<K, Map<string, number>>, k: K): string | undefined {
 
 async function main() {
   const [meta, years] = await Promise.all([
-    fetch(`https://data.delaware.gov/api/views/${PCARD}.json`).then((r) => r.json() as Promise<{ rowsUpdatedAt?: number }>),
+    fetch(`https://data.delaware.gov/api/views/${PCARD}.json`)
+      .then((r) => r.json() as Promise<{ rowsUpdatedAt?: number }>)
+      .catch(() => ({}) as { rowsUpdatedAt?: number }),
     soda<{ fiscal_year: string }>(PCARD, { $select: "fiscal_year", $group: "fiscal_year", $order: "fiscal_year" }),
   ]);
   const fys = years.map((r) => Number(r.fiscal_year)).filter((fy) => fy >= FIRST_FY);
