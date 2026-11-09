@@ -333,11 +333,11 @@ function PaySplit({ t, s }: { t: Theme; s: Shares }) {
       <p className={`mt-1.5 flex flex-wrap justify-between gap-x-3 text-xs ${t.muted}`}>
         <span title={PCARD_TITLE}>
           <span className={`mr-1 inline-block h-2 w-2 rounded-sm ${t.barPcard}`} />
-          P-card <strong className={t.text}>{fmtMoney(s.pcard)}</strong> ({fmtPct(s.pcard, s.total)})
+          P-Card <strong className={t.text}>{fmtMoney(s.pcard)}</strong> ({fmtPct(s.pcard, s.total)})
         </span>
         <span>
           <span className={`mr-1 inline-block h-2 w-2 rounded-sm ${t.bar}`} />
-          Invoice <strong className={t.text}>{fmtMoney(invoice)}</strong>
+          Contract <strong className={t.text}>{fmtMoney(invoice)}</strong>
         </span>
       </p>
     </div>
@@ -647,7 +647,7 @@ export function SpendingHome({ variant, year }: { variant: Variant; year: Year }
                 <span>Department</span>
                 <span>Small purchases</span>
                 <span className="text-right">Vendors</span>
-                <span className="text-right" title={PCARD_TITLE}>P-card</span>
+                <span className="text-right" title={PCARD_TITLE}>P-Card</span>
                 <span className="text-right">Large biz</span>
                 <span className="text-right">Small biz</span>
                 <span className="text-right" title={DIVERSE_TITLE}>Diverse</span>
