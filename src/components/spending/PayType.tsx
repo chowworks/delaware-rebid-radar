@@ -12,7 +12,7 @@ export function PayType({ t, pcard }: { t: Theme; pcard: boolean }) {
   return (
     <span
       title={pcard ? PCARD_TITLE : INVOICE_TITLE}
-      className={`inline-flex items-center whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${pcard ? t.badgePcard : t.badgeInvoice}`}
+      className={`inline-flex items-center whitespace-nowrap rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${pcard ? t.badgePcard : t.badgeInvoice}`}
     >
       {pcard ? "P-card" : "Invoice"}
     </span>

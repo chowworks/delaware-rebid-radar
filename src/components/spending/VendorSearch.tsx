@@ -69,7 +69,7 @@ export default function VendorSearch({
                   <Link href={`/spending/vendors/${slug}`} className={`flex items-center justify-between gap-3 px-3 py-2 ${classes.row}`}>
                     <span className={`min-w-0 truncate ${classes.text}`}>
                       {name}
-                      {pcard ? <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase ${classes.pcard}`}>P-card</span> : null}
+                      {pcard ? <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-semibold ${classes.pcard}`}>P-card</span> : null}
                     </span>
                     <span className={`shrink-0 text-xs tabular-nums ${classes.muted}`}>
                       {money(total)}
