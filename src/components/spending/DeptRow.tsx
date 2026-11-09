@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { fmtMoney } from "@/lib/format";
 import type { DivisionBranch } from "@/lib/spending";
+import { PayType } from "./PayType";
 import type { Theme } from "./theme";
 
 // One department on /spending. Its divisions and their top vendors load from
@@ -99,6 +100,7 @@ export function VendorLine({ t, v, max, share }: { t: Theme; v: BranchVendor; ma
     <li className="grid grid-cols-[minmax(0,1fr)_14rem] items-center gap-x-4">
       <span className="flex min-w-0 flex-wrap items-center gap-1.5">
         <span className={`truncate ${t.text}`}>{v.name}</span>
+        <PayType t={t} pcard={v.pcard} />
         {v.size === "large" && <Badge className={t.badgeLarge}>Large business</Badge>}
         {v.size === "small" && <Badge className={t.badgeSmall}>Small business</Badge>}
         {v.size === "nonprofit" && <Badge className={t.badgeNonprofit}>Nonprofit</Badge>}

@@ -1,10 +1,15 @@
 import "server-only";
-import raw from "@/data/spending.json";
+import rawCheckbook from "@/data/spending.json";
+import rawPcard from "@/data/pcard.json";
 import sizes from "@/data/vendor-sizes.json";
 import { ACCOUNTS, THRESHOLDS, slugify, type Tier } from "./spending-rules";
 
-// Reads the Checkbook snapshot built by scripts/build-spending.ts and answers
-// the questions on the spending pages.
+// Reads the Checkbook snapshot built by scripts/build-spending.ts and the
+// P-card snapshot built by scripts/build-pcard.ts, and answers the questions
+// on the spending pages. Each vendor comes from one source: a Checkbook payee
+// (paid by check or ACH against an invoice) or a P-card merchant (paid with a
+// state purchase card). The Checkbook books card purchases to "DIV OF
+// ACCOUNTING", which build-spending.ts drops, so the two never double count.
 //
 // "Under the bid limit" is inferred, because payments carry no contract or PO
 // number: a vendor's payments from one department in one fiscal year, summed
@@ -25,7 +30,72 @@ interface Snapshot {
   rows: [number, number, number, number, number, number][];
 }
 
-const data = raw as unknown as Snapshot;
+interface PcardSnapshot {
+  builtAt: string;
+  pcardUpdatedAt: string | null;
+  fiscalYears: number[];
+  matchRate: number;
+  divisions: [string, string][];
+  accounts: string[];
+  merchants: [string, 0 | 1, number[]][];
+  contracts: [string, string][];
+  rows: [number, number, number, number, number, number][];
+}
+
+const checkbook = rawCheckbook as unknown as Snapshot;
+const pcard = rawPcard as unknown as PcardSnapshot;
+
+// One snapshot in the Checkbook's shape, P-card merchants appended after the
+// Checkbook vendors (so existing vendor slugs don't change). `isPcard[v]` says
+// which source vendor v came from.
+function merge(cb: Snapshot, pc: PcardSnapshot) {
+  const departments = [...cb.departments];
+  const deptIdx = new Map(departments.map((d, i) => [d, i]));
+  const divisions = [...cb.divisions];
+  const divIdx = new Map(divisions.map(([d, name], i) => [`${departments[d]}|${name}`, i]));
+  const accounts = [...cb.accounts];
+  const accountIdx = new Map(accounts.map((a, i) => [a, i]));
+  const contracts = [...cb.contracts];
+  const contractIdx = new Map(contracts.map(([, url], i) => [url, i]));
+  const at = <K,>(m: Map<K, number>, k: K, add: () => void) => {
+    if (!m.has(k)) {
+      m.set(k, m.size);
+      add();
+    }
+    return m.get(k)!;
+  };
+
+  const divMap = pc.divisions.map(([dept, div]) => {
+    const d = at(deptIdx, dept, () => departments.push(dept));
+    return at(divIdx, `${dept}|${div}`, () => divisions.push([d, div]));
+  });
+  const acctMap = pc.accounts.map((a) => at(accountIdx, a, () => accounts.push(a)));
+  const contractMap = pc.contracts.map((c) => at(contractIdx, c[1], () => contracts.push(c)));
+  const offset = cb.vendors.length;
+  const vendors = [
+    ...cb.vendors,
+    ...pc.merchants.map(([name, osd, refs]) => [name, osd, refs.map((r) => contractMap[r])] as Snapshot["vendors"][number]),
+  ];
+  const rows = [
+    ...cb.rows,
+    ...pc.rows.map(([div, m, acct, fy, amount, n]) => [divMap[div], m + offset, acctMap[acct], fy, amount, n] as Snapshot["rows"][number]),
+  ];
+  return {
+    snapshot: {
+      ...cb,
+      fiscalYears: [...new Set([...cb.fiscalYears, ...pc.fiscalYears])].sort((a, b) => a - b),
+      departments,
+      divisions,
+      accounts,
+      contracts,
+      vendors,
+      rows,
+    } as Snapshot,
+    isPcard: vendors.map((_, i) => i >= offset),
+  };
+}
+
+const { snapshot: data, isPcard } = merge(checkbook, pcard);
 
 export const INDIVIDUALS = "Individual payees (names withheld)";
 
@@ -46,6 +116,8 @@ export interface Payment {
 
 export interface VendorInfo {
   name: string;
+  // Paid with a state purchase card (P-card) rather than by invoice.
+  pcard: boolean;
   slug: string;
   osd: boolean;
   contracts: { title: string; url: string }[];
@@ -89,6 +161,7 @@ function build() {
     const peakStateTotal = peak.get(i) ?? 0;
     return {
       name,
+      pcard: isPcard[i],
       slug: `${slugify(name)}-${i}`,
       osd: !!osd,
       contracts: refs.map((r) => ({ title: data.contracts[r][0], url: data.contracts[r][1] })),
@@ -119,6 +192,9 @@ export function snapshotInfo() {
   return {
     builtAt: data.builtAt,
     checkbookUpdatedAt: data.checkbookUpdatedAt,
+    pcardBuiltAt: pcard.builtAt,
+    pcardUpdatedAt: pcard.pcardUpdatedAt,
+    pcardMatchRate: pcard.matchRate,
     fiscalYears: data.fiscalYears,
     latestYear: data.fiscalYears[data.fiscalYears.length - 1],
   };
@@ -154,9 +230,10 @@ export interface Shares {
   nonprofit: number;
   unknown: number;
   osd: number;
+  pcard: number;
 }
 
-export const emptyShares = (): Shares => ({ total: 0, large: 0, small: 0, nonprofit: 0, unknown: 0, osd: 0 });
+export const emptyShares = (): Shares => ({ total: 0, large: 0, small: 0, nonprofit: 0, unknown: 0, osd: 0, pcard: 0 });
 
 function shares(list: Payment[], vendors: VendorInfo[]): Shares {
   const by = emptyShares();
@@ -164,6 +241,7 @@ function shares(list: Payment[], vendors: VendorInfo[]): Shares {
     by.total += p.amount;
     by[vendors[p.vendor].size] += p.amount;
     if (vendors[p.vendor].osd) by.osd += p.amount;
+    if (vendors[p.vendor].pcard) by.pcard += p.amount;
   }
   return by;
 }
@@ -357,6 +435,27 @@ export function checkbookCsv(opts: { department?: string; vendor?: string; accou
   return `https://data.delaware.gov/resource/7bip-nb4g.csv?${params}`;
 }
 
+// Payment records behind one vendor's figure, from whichever source it came
+// from.
+export function vendorCsv(v: VendorInfo, opts: { department?: string; account?: string; year?: Year }) {
+  return v.pcard ? pcardCsv({ merchant: v.name, year: opts.year }) : checkbookCsv({ ...opts, vendor: v.name });
+}
+
+// Card transactions behind a P-card merchant, as a CSV from the state's
+// portal. Merchant names were cleaned up for display ("AMZN Mktp US*2K4..." is
+// AMAZON), so this searches for the cleaned name and may miss some spellings.
+export function pcardCsv(opts: { merchant: string; year?: Year }) {
+  const where = [`upper(merchant) like '%${opts.merchant.toUpperCase().replace(/'/g, "''")}%'`];
+  if (opts.year && opts.year !== "all") where.push(`fiscal_year=${Number(opts.year)}`);
+  const params = new URLSearchParams({
+    $select: "fiscal_year,trans_dt,dept_name,div_name,merchant,cat_descr,merchandise_amt",
+    $where: where.join(" AND "),
+    $order: "trans_dt DESC",
+    $limit: "10000",
+  });
+  return `https://data.delaware.gov/resource/nurt-5rqw.csv?${params}`;
+}
+
 // One department's divisions and their top vendors, for browsing small
 // purchases in place. Plain data: it goes to the browser as JSON.
 export interface DivisionBranch {
@@ -364,7 +463,7 @@ export interface DivisionBranch {
   slug: string;
   total: number;
   vendorCount: number;
-  vendors: { name: string; size: VendorSize; osd: boolean; onContract: boolean; total: number }[];
+  vendors: { name: string; size: VendorSize; osd: boolean; onContract: boolean; pcard: boolean; total: number }[];
 }
 
 export function departmentDivisions(slug: string, year: Year, vendorsPerDivision = 8): DivisionBranch[] | null {
@@ -391,6 +490,7 @@ export function departmentDivisions(slug: string, year: Year, vendorsPerDivision
           size: vendors[v].size,
           osd: vendors[v].osd,
           onContract: vendors[v].contracts.length > 0,
+          pcard: vendors[v].pcard,
           total,
         })),
       };
@@ -424,6 +524,7 @@ export function categoryVendors(account: string, year: Year, smallOnly = false, 
       size: vendors[v].size,
       osd: vendors[v].osd,
       onContract: vendors[v].contracts.length > 0,
+      pcard: vendors[v].pcard,
       total,
     })),
   };
@@ -444,7 +545,7 @@ export function sizedVendors(): [string, "large" | "small" | "nonprofit", string
 
 // Named vendors whose name holds every word of `q`, largest purchase spend
 // first, for the vendor search box: [name, slug, total, small-purchase total,
-// on a state contract (0/1)].
+// on a state contract (0/1), P-card merchant (0/1)].
 let vendorTotals: [number, number, number][] | null = null; // [vendor, total, small], largest first
 
 export function searchVendors(q: string, limit = 8) {
@@ -473,7 +574,8 @@ export function searchVendors(q: string, limit = 8) {
       Math.round(total),
       Math.round(small),
       vendors[v].contracts.length ? 1 : 0,
-    ] as [string, string, number, number, 0 | 1]),
+      vendors[v].pcard ? 1 : 0,
+    ] as [string, string, number, number, 0 | 1, 0 | 1]),
   };
 }
 

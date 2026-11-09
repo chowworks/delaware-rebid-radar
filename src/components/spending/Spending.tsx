@@ -4,7 +4,7 @@ import { fmtDate, fmtMoney, fmtPct } from "@/lib/format";
 import {
     categoryDetail,
   categorySummaries,
-  checkbookCsv,
+  vendorCsv,
   departmentDetail,
   departmentSummaries,
   snapshotInfo,
@@ -20,6 +20,7 @@ import { THRESHOLDS, THRESHOLD_SOURCE, type Tier } from "@/lib/spending-rules";
 import CatRow from "./CatRow";
 import DeptRow from "./DeptRow";
 import Modal from "./Modal";
+import { PayType, PCARD_TITLE } from "./PayType";
 import QuickFilter from "./QuickFilter";
 import { THEMES, type Theme, type Variant } from "./theme";
 import VendorSearch from "./VendorSearch";
@@ -103,7 +104,7 @@ function Badge({ className, children, title }: { className: string; children: Re
   );
 }
 
-const DEPT_COLS = "grid-cols-[minmax(0,1fr)_12rem_4.5rem_4.5rem_4.5rem_3.5rem]";
+const DEPT_COLS = "grid-cols-[minmax(0,1fr)_12rem_4.5rem_4rem_4.5rem_4.5rem_3.5rem]";
 const CAT_COLS = "grid-cols-[minmax(0,1.4fr)_10rem_minmax(0,1fr)_4.5rem_4.5rem_4.5rem_8.5rem]";
 
 function Filter({ t, target, placeholder, noun }: { t: Theme; target: string; placeholder: string; noun: string }) {
@@ -116,6 +117,7 @@ function VendorBadges({ t, vendor: v }: { t: Theme; vendor: VendorInfo }) {
   const title = v.sizeMatch ? `Federal award records for ${v.sizeMatch}` : undefined;
   return (
     <>
+      <PayType t={t} pcard={v.pcard} />
       {v.size === "large" && <Badge className={t.badgeLarge} title={title}>Large business</Badge>}
       {v.size === "small" && <Badge className={t.badgeSmall} title={title}>Small business</Badge>}
       {v.size === "nonprofit" && <Badge className={t.badgeNonprofit} title={title}>Nonprofit</Badge>}
@@ -234,6 +236,11 @@ function SmallPurchaseNote({ t }: { t: Theme }) {
             vendor per year and type of purchase, and count it only if that stays under the no-bid limit and the vendor
             isn&apos;t on a state contract. Bigger purchases are bid publicly on <a className={t.link} href={OPEN_BIDS}>MMP</a>.
           </p>
+          <p className="mt-3">
+            Purchases made with a state <strong>P-card</strong> (credit card) are included and tagged, per merchant, under the
+            same rule. They never reach a vendor invoice, so the main payment data books them all to the Division of
+            Accounting; the merchant comes from the state&apos;s card transaction data.
+          </p>
           <p className={`mt-3 text-xs ${t.muted}`}>
             Agencies must ask at least one <a className={t.link} href={OSD_DIRECTORY}>certified diverse firm</a> for a quote on these buys.
           </p>
@@ -313,6 +320,30 @@ function DiverseInfo({ t }: { t: Theme }) {
   );
 }
 
+// How the money was paid: P-card vs invoice, as a split bar.
+function PaySplit({ t, s }: { t: Theme; s: Shares }) {
+  if (!s.total) return null;
+  const invoice = s.total - s.pcard;
+  return (
+    <div className="mt-4">
+      <div className={`flex h-2 overflow-hidden rounded-full ${t.barTrack}`}>
+        <span className={t.barPcard} style={{ width: `${(s.pcard / s.total) * 100}%` }} />
+        <span className={t.bar} style={{ width: `${(invoice / s.total) * 100}%` }} />
+      </div>
+      <p className={`mt-1.5 flex flex-wrap justify-between gap-x-3 text-xs ${t.muted}`}>
+        <span title={PCARD_TITLE}>
+          <span className={`mr-1 inline-block h-2 w-2 rounded-sm ${t.barPcard}`} />
+          P-Card <strong className={t.text}>{fmtMoney(s.pcard)}</strong> ({fmtPct(s.pcard, s.total)})
+        </span>
+        <span>
+          <span className={`mr-1 inline-block h-2 w-2 rounded-sm ${t.bar}`} />
+          Contract <strong className={t.text}>{fmtMoney(invoice)}</strong>
+        </span>
+      </p>
+    </div>
+  );
+}
+
 // The headline numbers: how much, who got it, and one line saying it plainly.
 function SpendSummary({ t, label, total, all, allLabel, shares, extras = [], subject, noun, period }: { t: Theme; label: string; total: number; all: number; allLabel: string; shares: Shares; extras?: [string, string][]; subject: string; noun: string; period: string }) {
   const rows = [
@@ -335,6 +366,7 @@ function SpendSummary({ t, label, total, all, allLabel, shares, extras = [], sub
             <Bar t={t} value={total} max={all} />
             <p className={`mt-1.5 text-xs ${t.muted}`}>{fmtPct(total, all)} of {fmtMoney(all)} {allLabel}</p>
           </div>
+          <PaySplit t={t} s={shares} />
           {extras.length > 0 && (
             <dl className={`mt-auto grid grid-cols-2 gap-3 border-t ${t.border} pt-4`}>
               {extras.map(([v, l]) => (
@@ -390,6 +422,16 @@ function DataNote({ t }: { t: Theme }) {
         State fiscal years run July to June.
       </p>
       <p className="mt-2">
+        P-card purchases: <a className={t.link} href="https://data.delaware.gov/d/nurt-5rqw">State Employee Credit Card Transactions</a>
+        {info.pcardUpdatedAt && <> (state update {fmtDate(info.pcardUpdatedAt.slice(0, 10))}, snapshot {fmtDate(info.pcardBuiltAt.slice(0, 10))})</>}.
+        That data names the merchant but not the spending category, and the Checkbook has the category but books every
+        card purchase to the Division of Accounting. We pair the two on department, amount and date, which matches{" "}
+        {Math.round(info.pcardMatchRate * 100)}% of card dollars; the rest, and months the Checkbook doesn&apos;t cover yet,
+        get the category the same merchant is usually booked to. Card purchases booked to travel, lodging, meals, dues
+        and conference fees are left out, like other non-purchase spending. Merchant names are shortened from the card
+        statement (&ldquo;AMZN Mktp US*2K4&hellip;&rdquo; shows as AMAZON).
+      </p>
+      <p className="mt-2">
         Left out: school districts, charter schools, DSU, DTCC, UD and the Legislature (not covered by the state procurement
         code), and payments to other governments and state accounts. Payments to individuals are pooled and never counted
         as small purchases. Company size isn&apos;t in Delaware&apos;s data, so it comes from federal award records on{" "}
@@ -433,7 +475,7 @@ function SpendTabs({ t, active, year }: { t: Theme; active: "dept" | "smallcat" 
 function FindVendor({ t }: { t: Theme }) {
   return (
     <VendorSearch
-      classes={{ input: `${t.border} bg-white ${t.text}`, panel: t.popover, muted: t.muted, text: t.text, divide: t.divide, row: t.rowHover }}
+      classes={{ input: `${t.border} bg-white ${t.text}`, panel: t.popover, muted: t.muted, text: t.text, divide: t.divide, row: t.rowHover, pcard: t.badgePcard }}
     />
   );
 }
@@ -504,7 +546,7 @@ function VendorDetails({ t, row, max, scope, csv }: { t: Theme; row: VendorRow; 
             ) : (
               <>
                 <li><Link className={t.link} href={`/spending/vendors/${row.vendor.slug}`}>This vendor across every department</Link></li>
-                <li><a className={t.link} href={csv}>Every payment, from the state (CSV)</a></li>
+                <li><a className={t.link} href={csv}>{row.vendor.pcard ? "Card transactions, from the state (CSV)" : "Every payment, from the state (CSV)"}</a></li>
               </>
             )}
             {row.vendor.contracts.map((c) => (
@@ -600,11 +642,12 @@ export function SpendingHome({ variant, year }: { variant: Variant; year: Year }
           </p>
           <div className="mt-4"><Filter t={t} target="dept-list" placeholder="Filter by department or division" noun="departments" /></div>
           <div id="dept-list" className={`${t.card} mt-3 overflow-x-auto`}>
-            <div className="min-w-[680px]">
+            <div className="min-w-[740px]">
               <div className={`grid ${DEPT_COLS} gap-x-4 border-b ${t.border} px-4 py-2 ${t.th}`}>
                 <span>Department</span>
                 <span>Small purchases</span>
                 <span className="text-right">Vendors</span>
+                <span className="text-right" title={PCARD_TITLE}>P-Card</span>
                 <span className="text-right">Large biz</span>
                 <span className="text-right">Small biz</span>
                 <span className="text-right" title={DIVERSE_TITLE}>Diverse</span>
@@ -630,6 +673,7 @@ export function SpendingHome({ variant, year }: { variant: Variant; year: Year }
                       <span className="mt-1 block"><Bar t={t} value={d.smallTotal} max={max} /></span>
                     </span>
                     <span className={`text-right tabular ${t.text}`}>{d.vendorCount.toLocaleString()}</span>
+                    <span className={`text-right tabular ${t.text}`}>{fmtPct(d.shares.pcard, d.shares.total)}</span>
                     <span className={`text-right tabular ${t.text}`}>{fmtPct(d.shares.large, d.shares.total)}</span>
                     <span className={`text-right tabular ${t.text}`}>{fmtPct(d.shares.small, d.shares.total)}</span>
                     <span className={`text-right tabular ${t.text}`}>{fmtPct(d.shares.osd, d.shares.total)}</span>
@@ -653,7 +697,7 @@ export function DepartmentSpending({ variant, slug, year, division }: { variant:
   const scopeName = d.division ? d.division.name : d.dept.name;
   const top10 = d.vendors.slice(0, 10).reduce((s, r) => s + r.total, 0);
   const divMax = Math.max(...d.divisions.map((x) => x.small), 0);
-  const csv = (r: VendorRow) => checkbookCsv({ department: d.dept.name, vendor: r.vendor.name, year });
+  const csv = (r: VendorRow) => vendorCsv(r.vendor, { department: d.dept.name, year });
 
   return (
     <>
@@ -874,7 +918,7 @@ export function CategorySpending({ variant, account, year, dept, small = false }
   const top = c.vendors[0];
   const top3 = c.vendors.slice(0, 3).reduce((s, r) => s + r.total, 0);
   const deptMax = Math.max(...c.departments.map((x) => x.total), 0);
-  const csv = (r: VendorRow) => checkbookCsv({ department: c.dept?.name, vendor: r.vendor.name, account, year });
+  const csv = (r: VendorRow) => vendorCsv(r.vendor, { department: c.dept?.name, account, year });
 
   return (
     <>
@@ -969,7 +1013,7 @@ export function VendorSpending({ variant, slug, year }: { variant: Variant; slug
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
-          <Stat t={t} value={fmtMoney(v.total)} label="Paid for purchases" sub={`${v.payments.toLocaleString()} payments from ${v.departments.length} department${v.departments.length === 1 ? "" : "s"}`} />
+          <Stat t={t} value={fmtMoney(v.total)} label={v.vendor.pcard ? "Paid by P-card" : "Paid for purchases"} sub={`${v.payments.toLocaleString()} ${v.vendor.pcard ? "card transactions" : "payments"} from ${v.departments.length} department${v.departments.length === 1 ? "" : "s"}`} />
           <Stat t={t} value={fmtMoney(v.smallTotal)} label="Small purchases" sub={`${fmtPct(v.smallTotal, v.total)} of the total`} />
           <Stat t={t} value={fmtMoney(bid)} label={onContract ? "On contract or over the limits" : "Over the bid limits"} sub={`${fmtPct(bid, v.total)} of the total`} />
         </div>
@@ -986,7 +1030,14 @@ export function VendorSpending({ variant, slug, year }: { variant: Variant; slug
               stays under the open-market limit ($50K for goods, $100K for professional services, $150K for public works).
             </>
           )}{" "}
-          Grants, salaries and other non-purchase payments aren&apos;t included.
+          {v.vendor.pcard ? (
+            <>
+              This is a P-card merchant: state employees paid it with purchase cards, so there is no invoice or purchase
+              order. Purchases from the same company by invoice show up under its invoiced name, if any.
+            </>
+          ) : (
+            <>Grants, salaries and other non-purchase payments aren&apos;t included.</>
+          )}
         </p>
 
         <div className="mt-10 grid gap-10 lg:grid-cols-2">
@@ -1047,7 +1098,7 @@ export function VendorSpending({ variant, slug, year }: { variant: Variant; slug
           <aside>
             <h2 className={t.h3}>Where to learn more</h2>
             <ul className="mt-3 space-y-2 text-sm">
-              <li><a className={t.link} href={checkbookCsv({ vendor: v.vendor.name, year })}>Every payment, from the state (CSV)</a></li>
+              <li><a className={t.link} href={vendorCsv(v.vendor, { year })}>{v.vendor.pcard ? "Card transactions, from the state (CSV)" : "Every payment, from the state (CSV)"}</a></li>
               {v.vendor.contracts.map((c) => (
                 <li key={c.url}><a className={t.link} href={c.url}>State contract: {c.title}</a></li>
               ))}

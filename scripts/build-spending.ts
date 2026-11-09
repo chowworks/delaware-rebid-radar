@@ -13,36 +13,12 @@
 // Vendors are flagged from two more datasets by normalized name:
 //   h9bb-iyu6 Awarded Vendor Contact Info -> on a current state contract
 //   8dxf-6ahp OSD certified firms          -> certified small/diverse business
-import { writeFileSync } from "node:fs";
-import { ACCOUNTS, isExemptPayer, isPublicPayee, normalizeVendor } from "../src/lib/spending-rules";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { ACCOUNTS, isExemptPayer, isPublicPayee } from "../src/lib/spending-rules";
+import { loadVendorFlags, pages, soda } from "./socrata";
 
-const BASE = "https://data.delaware.gov/resource";
 const CHECKBOOK = "7bip-nb4g";
-const PAGE = 50_000;
 const INDIVIDUALS = "Individual payees (names withheld)";
-
-async function soda<T>(id: string, params: Record<string, string>): Promise<T[]> {
-  const url = `${BASE}/${id}.json?${new URLSearchParams(params)}`;
-  for (let attempt = 1; ; attempt++) {
-    try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(180_000) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (err) {
-      if (attempt >= 5) throw new Error(`${id}: ${err}`);
-      await new Promise((r) => setTimeout(r, 2000 * 2 ** attempt));
-    }
-  }
-}
-
-async function pages<T>(id: string, params: Record<string, string>): Promise<T[]> {
-  const out: T[] = [];
-  for (let offset = 0; ; offset += PAGE) {
-    const rows = await soda<T>(id, { ...params, $limit: String(PAGE), $offset: String(offset) });
-    out.push(...rows);
-    if (rows.length < PAGE) return out;
-  }
-}
 
 async function pool<T, R>(items: T[], size: number, fn: (t: T) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(items.length);
@@ -91,38 +67,10 @@ async function main() {
     return rows.map((r) => ({ ...r, fy: Number(fy) }));
   });
 
-  const [contractVendors, osdFirms, meta] = await Promise.all([
-    soda<{ companyname?: string; contracttitle?: string; contracturl?: { url?: string } }>("h9bb-iyu6", {
-      $select: "companyname, contracttitle, contracturl",
-      $limit: "50000",
-    }),
-    soda<{ name?: string; certificatenumber?: string }>("8dxf-6ahp", { $select: "name, certificatenumber", $limit: "50000" }),
+  const [flags, meta] = await Promise.all([
+    loadVendorFlags(),
     fetch(`https://data.delaware.gov/api/views/${CHECKBOOK}.json`).then((r) => r.json() as Promise<{ rowsUpdatedAt?: number }>),
   ]);
-
-  const contractsByName = new Map<string, { title: string; url: string }[]>();
-  for (const v of contractVendors) {
-    if (!v.companyname) continue;
-    const key = normalizeVendor(v.companyname);
-    const list = contractsByName.get(key) ?? [];
-    const url = (v.contracturl?.url ?? "").replace(/^http:/, "https:");
-    if (!list.some((c) => c.url === url)) list.push({ title: v.contracttitle ?? "State contract", url });
-    contractsByName.set(key, list);
-  }
-  const osdNames = new Set(osdFirms.filter((f) => f.name).map((f) => normalizeVendor(f.name!)));
-  const contractKeys = [...contractsByName.keys()];
-
-  // The Checkbook cuts names at 40 characters; for those, accept a list name
-  // that starts with the cut name minus its last (possibly partial) word.
-  function lookup<V>(raw: string, exact: (k: string) => V | undefined, keys: Iterable<string>): V | undefined {
-    const key = normalizeVendor(raw);
-    const hit = exact(key);
-    if (hit !== undefined || raw.length < 38) return hit;
-    const stem = key.split(" ").slice(0, -1).join(" ");
-    if (stem.length < 12) return undefined;
-    for (const k of keys) if (k.startsWith(stem)) return exact(k);
-    return undefined;
-  }
 
   const deptIdx = new Map<string, number>();
   const divIdx = new Map<string, number>();
@@ -152,8 +100,8 @@ async function main() {
     if (!vendorIdx.has(vendor)) {
       vendorIdx.set(vendor, vendors.length);
       const isPerson = vendor === INDIVIDUALS;
-      const osd = !isPerson && lookup(vendor, (k) => (osdNames.has(k) ? true : undefined), osdNames) ? 1 : 0;
-      const onContract = isPerson ? undefined : lookup(vendor, (k) => contractsByName.get(k), contractKeys);
+      const osd = !isPerson && flags.osd(vendor) ? 1 : 0;
+      const onContract = isPerson ? undefined : flags.contracts(vendor);
       const refs = (onContract ?? []).slice(0, 5).map((c) => {
         if (!contractIdx.has(c.url)) {
           contractIdx.set(c.url, contracts.length);
@@ -191,7 +139,30 @@ async function main() {
     // [division, vendor, account, fiscal year, dollars, payments]
     rows: rows.filter((r) => r[4] !== 0),
   };
-  writeFileSync("src/data/spending.json", JSON.stringify(out));
+  // The state reloads the Checkbook in place; mid-reload it can be missing
+  // whole years (2026-11-08: FY2026-27 gone, FY2025 cut at 2.2M rows). Refuse
+  // to replace a snapshot with one that lost a year or a big share of one.
+  const OUT = "src/data/spending.json";
+  if (existsSync(OUT) && !process.env.FORCE) {
+    const prev = JSON.parse(readFileSync(OUT, "utf8")) as typeof out;
+    const totals = (rows: typeof out.rows) => {
+      const m = new Map<number, number>();
+      for (const r of rows) m.set(r[3], (m.get(r[3]) ?? 0) + r[4]);
+      return m;
+    };
+    const before = totals(prev.rows);
+    const after = totals(out.rows);
+    const lost = [...before].filter(([fy, t]) => (after.get(fy) ?? 0) < t * 0.9);
+    if (lost.length) {
+      console.error(
+        `Not writing ${OUT}: the Checkbook looks incomplete. Down >10% vs the current snapshot: ` +
+          lost.map(([fy, t]) => `FY${fy} $${Math.round(t / 1e6)}M -> $${Math.round((after.get(fy) ?? 0) / 1e6)}M`).join(", ") +
+          ". Run with FORCE=1 to write anyway.",
+      );
+      process.exit(1);
+    }
+  }
+  writeFileSync(OUT, JSON.stringify(out));
   console.log(
     `Wrote ${out.rows.length} rows, ${vendors.length} vendors (${vendors.filter((v) => v[1]).length} OSD, ${vendors.filter((v) => v[2].length).length} on contract)`,
   );

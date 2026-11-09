@@ -33,6 +33,9 @@ export const THEMES = {
     badgeNonprofit: "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-400/30",
     badgeOsd: "bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-600/20",
     badgeContract: "bg-navy-50 text-navy-800 ring-1 ring-inset ring-navy-700/20",
+    badgePcard: "bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-500/40",
+    badgeInvoice: "bg-white text-slate-600 ring-1 ring-inset ring-slate-300",
+    barPcard: "bg-amber-500",
     rowHover: "hover:bg-slate-50",
   },
   v2: {
@@ -67,6 +70,9 @@ export const THEMES = {
     badgeNonprofit: "bg-paper text-ink-700 ring-1 ring-inset ring-line",
     badgeOsd: "bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-600/20",
     badgeContract: "bg-de-50 text-de-700 ring-1 ring-inset ring-de-600/20",
+    badgePcard: "bg-amber-50 text-amber-900 ring-1 ring-inset ring-amber-500/50",
+    badgeInvoice: "bg-white text-ink-600 ring-1 ring-inset ring-line",
+    barPcard: "bg-amber-500",
     rowHover: "hover:bg-paper",
   },
 };
